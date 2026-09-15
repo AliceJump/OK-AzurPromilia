@@ -1,0 +1,10 @@
+{
+    "global_config_store_v2_task_scoped": [
+        "Zip Line Config",
+        "Game Hotkey Config",
+        "Ensure Main Once Action Sleep",
+        "Battle Config"
+    ],
+    "zip_line_account_overrides_v1": true,
+    "global_config_store_v2_task_scoped_backup": true
+}
