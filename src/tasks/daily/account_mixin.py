@@ -109,7 +109,7 @@ class AccountMixin(AccountOverrideMixin):
         self.current_account_id = account_id
         self._bind_account_aware_config_get()
 
-    def login_flow(self, username: str, password: str | None = None):
+    def login_flow(self, username: str):
         """切换到指定账号：回主界面 → 设置 → 登出 → 确认 → 切号 → 选账号 → 登录。
 
         全程用 ``wait_click_feature`` / ``wait_click_ocr``，元素缺失时只记日志不中断
@@ -118,19 +118,39 @@ class AccountMixin(AccountOverrideMixin):
 
         Args:
             username: 要切换到的账号标识（手机号）；界面按后四位匹配。
-            password: 兼容参数，ok-ap 不存储也不使用密码。
-
-        注意：此方法需要子类实现具体的游戏界面操作逻辑。
         """
-        if result:=self.find_feature(feature_name=FeatureList.login_out ,mask_function=self.make_hsv_isolator(HSVRange.WHITE)):
-            self.click(result)
-        self.wait_click_feature(feature=FeatureList.confirm_button_2 ,settle_time=1 ,box=self.box_of_screen(0.5756,0.6126,0.5932,0.6420))
-        if result:=self.wait_feature(feature=FeatureList.account_switch):
-            self.click_at_box(result)
-        if result:=self.wait_ocr(match=re.compile(username), box=self.box_of_screen(0.3702,0.5390,0.5035,0.7178)):
-            self.click_at_box(result)
-        if result:=self.wait_feature(feature=FeatureList.login_in):
-            self.click_at_box(result)
+        if not (result := self.find_feature(
+        feature_name=FeatureList.login_out,
+            mask_function=self.make_hsv_isolator(HSVRange.WHITE),
+        )):
+            return
+        self.click(result)
+        if not self.active_and_send_mouse_delta(0, 0, activate=True, only_activate=True):
+            self.log_error("无法激活游戏窗口，已取消登录以避免误点其他窗口")
+            return False
+        if not self.wait_click_feature(
+            feature=FeatureList.confirm_button_2,
+            settle_time=1,
+            box=self.box_of_screen(0.5756, 0.6126, 0.5932, 0.6420),
+        ):
+            return
+
+        if not (result := self.wait_feature(feature=FeatureList.account_switch)):
+            return
+        self.click_at_box(result)
+
+        if not (
+            result := self.wait_ocr(
+                match=re.compile(username),
+                box=self.box_of_screen(0.3702, 0.5390, 0.5035, 0.7178),
+            )
+        ):
+            return
+        self.click_at_box(result)
+
+        if not (result := self.wait_feature(feature=FeatureList.login_in)):
+            return
+        self.click_at_box(result)
 
     def iter_multi_account_context(
         self,
