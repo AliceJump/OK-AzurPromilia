@@ -260,6 +260,7 @@ ok-lang-hints
 /working_images/
 /click_screenshots/
 /items_process/
+/configs/
 /tests/configs
 /tests/logs
 label_class
