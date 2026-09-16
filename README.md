@@ -28,22 +28,21 @@
     <a href="#run-from-source">🚀 从源码运行</a> ·
     <a href="docs/dev/DEVELOPMENT.md">📖 开发指南</a> ·
     <a href="docs/index.md">📚 项目文档</a> ·
-    <a href="#faq">🛠️ 常见问题</a> ·
-    <a href="https://github.com/Beatrice-betty/OK-AzurPromilia">⭐ 点亮小星星</a>
+    <a href="https://github.com/longer-sausage/OK-AzurPromilia">⭐ 点亮小星星</a>
   </p>
 
 </div>
 
 ---
 
-> **项目状态：工程骨架已就位，游戏内容尚未实机开发。**
+> 📌 **项目状态：工程骨架已就位，游戏内容尚未实机开发。**
 >
 > 本仓库当前提供的是**一套可以跑起来的 ok-script 应用工程 + 通用能力底座**
 > （配置、任务注册、键鼠交互、图像识别、多账户、i18n、测试与发布流水线），
 > 这部分代码是真实、可运行、有测试覆盖的。
 >
 > 但**旅瑶的游戏侧内容基本还没写**：窗口参数、UI 模板、按键表、“我在主界面吗”的判定、
-> 日常/战斗/跑图等任务，**全部处于待实机确认或未开始的状态**。
+> 日常 / 战斗 / 跑图等任务，**全部处于待实机确认或未开始的状态**。
 >
 > **所以现阶段它还不是一个能拿来挂机的成品**，请以「从源码运行 + 参与开发」的视角使用。
 > 详细进度与技术债见 [docs/index.md](docs/index.md)。
@@ -61,7 +60,7 @@
 <!-- TODO（发布前补全）：在此处补上《蓝色星原：旅谣》官方用户协议 / 公平运营声明中
      关于第三方工具的原文引用与链接，格式可参照 ok-ww、ok-nte 的免责声明章节。 -->
 
-## 这是什么
+## 🎮 这是什么
 
 `ok-ap` 是面向《蓝色星原：旅谣》（Azur Promilia）的 ok-script 自动化项目。ok-script 是一套
 「截图 → 图像识别 → 模拟键鼠」的游戏自动化框架，`ok-ap` 在此之上提供旅瑶这一款游戏所需要的
@@ -72,7 +71,6 @@
 > **尚未发布正式版本。** 自动发版流水线（`auto_release` + `build`）已经就位，
 > 正式发版后会在此提供安装包；在那之前请[从源码运行](#run-from-source)。
 
-
 ## 🖥️ 运行环境
 
 - 操作系统：Windows（x64）。
@@ -81,6 +79,7 @@
 - 游戏分辨率、画面滤镜、游戏语言等要求 —— **[待验证]**，尚未实机确认，确认后会补到这里。
 
 <a id="run-from-source"></a>
+
 ## 🚀 从源码运行
 
 依赖管理使用 [uv](https://docs.astral.sh/uv/)（需先安装 uv），且**仅支持 Python 3.12**。
@@ -112,7 +111,6 @@ ok-ap.exe -t 1 -e
 | `-h` | 无头（headless）模式，不启动界面。**注意：这不是 `--help`。** |
 | `--help` | 查看帮助。 |
 
-
 ## 🧪 开发与测试
 
 ```bash
@@ -135,13 +133,12 @@ uv run python -m unittest discover -s tests
 - 二重螺旋 [BnanZ0/ok-duet-night-abyss](https://github.com/BnanZ0/ok-duet-night-abyss)
 - 白荆回廊（停止更新） [ok-oldking/ok-baijing](https://github.com/ok-oldking/ok-baijing)
 
-<a id="thanks"></a>
 ## ❤️ 致谢
 
 ### 贡献者
 
-<a href="https://github.com/Beatrice-betty/OK-AzurPromilia/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Beatrice-betty/OK-AzurPromilia" alt="Contributors" />
+<a href="https://github.com/longer-sausage/OK-AzurPromilia/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=longer-sausage/OK-AzurPromilia" alt="Contributors" />
 </a>
 
 ### 特别感谢
