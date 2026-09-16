@@ -1,0 +1,18 @@
+{
+    "System Notification": true,
+    "Discord Notification": false,
+    "Discord Webhook": "",
+    "Telegram Notification": false,
+    "Telegram Bot Token": "",
+    "Telegram Chat ID": "",
+    "Enterprise WeChat Webhook Notification": false,
+    "Enterprise WeChat Webhook URL": "",
+    "QQ Bot API Notification": false,
+    "QQ Bot API App ID": "",
+    "QQ Bot API Token": "",
+    "QQ Bot API Channel ID": "",
+    "QQ Desktop Notification (Not Reliable)": false,
+    "QQ Desktop Nickname": "",
+    "WeChat Desktop Notification (Not Reliable)": false,
+    "WeChat Desktop Nickname": ""
+}
