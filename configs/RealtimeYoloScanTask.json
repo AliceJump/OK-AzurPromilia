@@ -1,6 +1,0 @@
-{
-    "YOLO模型": "battle_end_default",
-    "检测目标": "battle_end",
-    "检测置信度": 0.7,
-    "扫描间隔(秒)": 0.2
-}
