@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="doc/AzurPromilia.svg" alt="蓝色星原：旅谣" width="360" />
+  <img src="docs/AzurPromilia.svg" alt="蓝色星原：旅谣" width="360" />
 
   <h1>OK-AzurPromiliaScript</h1>
 
