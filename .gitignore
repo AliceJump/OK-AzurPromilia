@@ -249,6 +249,7 @@ thread_dumps.txt
 labels
 ok-lang-hints
 .vscode
+.agents
 
 ############################
 # 🗂 运行生成数据（仅忽略根目录）
