@@ -61,7 +61,7 @@ class DailyTaskRunner:
         """
         self.task = task
         self.task_items = list(task_items)
-        self.ensure_main_kwargs = dict(ensure_main_kwargs or {"recheck_time": 2, "time_out": 90})
+        self.ensure_main_kwargs = dict(ensure_main_kwargs or {"time_out": 90})
         self.publish_info = publish_info
         self.task_status = _new_task_status(self.task_items)
         self.current_task_key: str | None = None
@@ -255,7 +255,7 @@ class DailyTaskRunner:
                     if getattr(self.task, "_logged_in", False):
                         self.task.ensure_main(**self.ensure_main_kwargs)
                     else:
-                        self.task.ensure_main(recheck_time=2, time_out=600)
+                        self.task.ensure_main(time_out=600)
 
                 self.task.log_info(
                     self._tr("开始第 {idx}/{total} 轮任务执行").format(idx=round_index, total=repeat_total)

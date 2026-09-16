@@ -248,6 +248,8 @@ md5.txt
 thread_dumps.txt
 labels
 ok-lang-hints
+.vscode
+.agents
 
 ############################
 # 🗂 运行生成数据（仅忽略根目录）
@@ -264,6 +266,8 @@ ok-lang-hints
 /tests/configs
 /tests/logs
 label_class
+/screenshots/
+
 
 ############################
 # 🧠 OCR / 标注输出

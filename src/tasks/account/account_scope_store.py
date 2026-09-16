@@ -87,19 +87,14 @@ def _parse_account_list_text_internal(account_list_text: Any) -> tuple[list[dict
         if not line:
             continue
 
-        if "," in line:
-            username_part, password_part = line.split(",", 1)
-            username = username_part.strip()
-            password = password_part.strip()
-        else:
-            username = line.strip()
-            password = ""
+        # 兼容旧 `账号,密码` 格式，只取逗号前的用户名
+        username = line.split(",", 1)[0].strip()
 
         if not username:
             invalid_lines.append(line)
             continue
 
-        entries.append({"username": username, "password": password})
+        entries.append({"username": username})
 
     return entries, invalid_lines
 
