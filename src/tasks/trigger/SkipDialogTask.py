@@ -38,8 +38,7 @@ class SkipDialogTask(BaseGameTask, TriggerTask):
 
             # 处理 Confirm
             if confirm := self.find_confirm():
-                # 按钮刚出现时游戏会丢弃点击，这里等 confirm_click_delay 再点
-                self.click_confirm_target(confirm)
+                self.click(confirm)
 
                 self.wait_until(
                     lambda: not self.find_confirm(),
