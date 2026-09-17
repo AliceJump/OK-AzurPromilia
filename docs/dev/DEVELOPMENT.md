@@ -95,6 +95,15 @@ self.find_button(box, thresholds=SKIP_BUTTON)
   只用文字特征误报 17，加上底色区间后 0，命中率不变，单次 +0.07 ms。按需开启。
 - 所有阈值集中在 `ButtonThresholds`，用 `with_(...)` 生成改过的副本，不修改默认值。
 - 传入的 Box 要**贴合按钮**；Box 远大于按钮时文本带相对过薄，会被形状判定拒绝。
+- **按钮刚出现（淡入中）时不要立刻点**：本检测器只要求「中央有文本状的亮色带」，
+  比模板匹配灵敏得多，按钮还没可点就会命中，此时点击会被游戏丢弃，表现为
+  「第一次点不上、隔一会儿再点才生效」。用 `settle_time` 要求连续稳定后再返回：
+
+  ```python
+  self.find_button(box, settle_time=0.15)   # 连续命中 0.15s 才算命中
+  ```
+
+  `BaseGameTask.confirm_settle_time`（默认 0.15）就是给 `find_confirm()` 用的这个值，按需调大。
 
 ## 配置键迁移
 
