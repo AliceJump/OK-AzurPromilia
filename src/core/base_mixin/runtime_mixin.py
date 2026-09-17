@@ -591,6 +591,8 @@ class RuntimeMixin:
         text_hsv=None,
         backdrop_hsv=None,
         require_backdrop: bool | None = None,
+        settle_time: float = 0.0,
+        time_out: float = 1.0,
     ):
         """在固定 Box 内检测按钮是否出现，不使用 OCR。
 
@@ -604,23 +606,36 @@ class RuntimeMixin:
             self.find_button(box, text_hsv=((0, 0, 170), (180, 100, 255)))
             self.find_button(box, thresholds=SKIP_BUTTON)
 
-        本检测器只要求「中央有文本状的亮色带」，比模板匹配灵敏得多：按钮刚出现（淡入尚未
-        可点）时就会命中，此时点击会被游戏丢弃，表现为「第一次点不上」。**这是点击时机
-        问题，不是检测问题**——检测照旧保持单帧最快返回，只在点击前等一小会儿即可
-        （见 ``BaseGameTask.confirm_click_delay`` / ``click_confirm_target``）。
+        **按钮淡入期要传 ``settle_time``**：本检测器只要求「中央有文本状的亮色带」，
+        比模板匹配灵敏得多，按钮刚开始淡入（尚未可点）时就会命中，此时点击会被游戏丢弃，
+        表现为「第一次点不上、隔一会儿再点才生效」。传 ``settle_time=0.15`` 左右可要求
+        连续稳定该时长后才返回，跳过不可点的窗口。
 
         Args:
             box: 按钮所在区域（由 box_of_screen / box_of_screen_scaled 生成）。
-            frame: 输入帧，缺省取 self.next_frame()。
+            frame: 输入帧，缺省取 self.next_frame()；``settle_time > 0`` 时忽略（需要连续取帧）。
             name: 结果 Box 的名称。
             thresholds: 完整阈值（可由 ButtonThresholds.for_button 生成后复用）。
             text_hsv: 文字颜色区间 ((h,s,v), (h,s,v))，覆盖 thresholds 中的设置。
             backdrop_hsv: 底色区间；传入即默认开启底色校验。
             require_backdrop: 显式指定是否校验底色。
+            settle_time: >0 时要求「连续稳定该时长」才判定命中，用于避开按钮淡入期。
+            time_out: ``settle_time > 0`` 时的最长等待时间。
 
         Returns:
             Box | None: 命中返回可直接 click() 的 Box，未命中返回 None。
         """
+        if settle_time > 0:
+            return self.wait_button(
+                box,
+                time_out=time_out,
+                settle_time=settle_time,
+                name=name,
+                thresholds=thresholds,
+                text_hsv=text_hsv,
+                backdrop_hsv=backdrop_hsv,
+                require_backdrop=require_backdrop,
+            )
         frame = frame if frame is not None else self.next_frame()
         if frame is None:
             return None

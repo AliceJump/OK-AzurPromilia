@@ -458,7 +458,7 @@ class BaseGameTask(RuntimeMixin, FrameworkOverrideMixin, BaseTask):
             self.next_frame()
             confirm = self.find_confirm()
             if confirm:
-                self.click_confirm_target(confirm)
+                self.click(confirm)
 
                 if disappear_time_out > 0:
                     self.wait_until(
@@ -473,7 +473,7 @@ class BaseGameTask(RuntimeMixin, FrameworkOverrideMixin, BaseTask):
                     self.sleep(recheck_time)
 
                     if confirm := self.find_confirm():
-                        self.click_confirm_target(confirm)
+                        self.click(confirm)
                         if disappear_time_out > 0:
                             self.wait_until(
                                 lambda: not self.find_confirm(),
@@ -490,20 +490,21 @@ class BaseGameTask(RuntimeMixin, FrameworkOverrideMixin, BaseTask):
                 return False
 
             self.sleep(0.01)
-    #: 点击「按钮检测器命中的」确认按钮前的等待（秒）。
-    #: 按钮检测器比模板匹配灵敏，按钮刚出现（淡入尚未可点）时就会命中，此时点击会被游戏
-    #: 丢弃，表现为「第一次点不上、隔一会儿再点才生效」。检测本身是快的，所以只在**即将
-    #: 点击**时等这一小会儿，不拖慢检测；调大可更稳，调 0 则完全不等待。
-    #: 模板匹配命中的确认按钮不需要这个延迟（能匹配上说明按钮已经渲染完整），直接点。
-    confirm_click_delay = 0.1
+    #: 确认按钮需连续稳定该时长才视为「可点」。
+    #: 按钮检测器比模板匹配灵敏，按钮刚开始淡入（尚未可点）时就会命中，
+    #: 此时点击会被游戏丢弃，表现为「第一次点不上、隔一会儿再点才生效」。
+    #: 留一点稳定时间再返回即可跳过这个窗口；调大更稳但更慢。
+    confirm_settle_time = 0.15
 
     def find_confirm(self):
         """查找对话框中的确认按钮，返回匹配的特征或 None。"""
-        frame=self.next_frame()
-        return self.find_button(
-            frame=frame,
+        if confirm := self.find_button(
             box=self.box_of_screen(0.6323,0.7046,0.7193,0.7750),
-        ) or self.find_one(
+            settle_time=self.confirm_settle_time,
+        ):
+            return confirm
+        frame=self.next_frame()
+        return self.find_one(
             feature=[FeatureList.confirm_button, FeatureList.confirm_button_2],
             vertical_variance=0.01,
             horizontal_variance=0.02,
@@ -513,23 +514,4 @@ class BaseGameTask(RuntimeMixin, FrameworkOverrideMixin, BaseTask):
             box=self.box_of_screen(0.5753,0.6116,0.5957,0.6420),
             frame=frame
         )
-
-    def click_confirm_target(self, confirm, after_sleep=0):
-        """点击确认按钮。
-
-        **只有按钮检测器命中的结果需要延后点击**：它可能在按钮刚出现（淡入尚未可点）时
-        就命中，此时点击会被游戏丢弃。检测器返回的 Box 带 ``needs_click_delay`` 标记，
-        这里据此等 ``confirm_click_delay``；模板匹配命中的结果能匹配上说明按钮已渲染完整，
-        直接点。
-
-        Args:
-            confirm: ``find_confirm()`` 返回的 Box。
-            after_sleep: 点击后的延迟时间。
-
-        Returns:
-            Any: ``self.click`` 的返回值。
-        """
-        if self.confirm_click_delay > 0 and getattr(confirm, "needs_click_delay", False):
-            self.sleep(self.confirm_click_delay)
-        return self.click(confirm, after_sleep=after_sleep)
     
