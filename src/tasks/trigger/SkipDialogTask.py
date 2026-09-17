@@ -39,13 +39,6 @@ class SkipDialogTask(BaseGameTask, TriggerTask):
             # 处理 Confirm
             if confirm := self.find_confirm():
                 self.click(confirm)
-
-                self.wait_until(
-                    lambda: not self.find_confirm(),
-                    time_out=0.8,
-                    raise_if_not_found=False,
-                )
-
                 # 成功点击后，继续等待下一段
                 deadline = self.active_time() + 3
                 continue
