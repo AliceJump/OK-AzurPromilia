@@ -104,12 +104,38 @@
       "image_id": 1,
       "category_id": 8,
       "bbox": [
-        1079,
+        1078,
         768,
-        70,
+        105,
         61
       ],
-      "area": 4270,
+      "area": 6405,
+      "iscrowd": 0
+    },
+    {
+      "id": 9,
+      "image_id": 1,
+      "category_id": 9,
+      "bbox": [
+        918,
+        335,
+        85,
+        126
+      ],
+      "area": 10710,
+      "iscrowd": 0
+    },
+    {
+      "id": 10,
+      "image_id": 1,
+      "category_id": 10,
+      "bbox": [
+        1243,
+        408,
+        21,
+        27
+      ],
+      "area": 567,
       "iscrowd": 0
     }
   ],
@@ -146,6 +172,16 @@
     {
       "id": 8,
       "name": "skip_confirm",
+      "supercategory": ""
+    },
+    {
+      "id": 9,
+      "name": "treasure_icon",
+      "supercategory": ""
+    },
+    {
+      "id": 10,
+      "name": "treasure_key_icon",
       "supercategory": ""
     }
   ]
