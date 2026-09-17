@@ -1,10 +1,8 @@
-from ok import Logger, TriggerTask
+from ok import TriggerTask
 
 from src.core.BaseGameTask import BaseGameTask
 from src.data.FeatureList import FeatureList
 from src.icons import Icons
-
-logger = Logger.get_logger(__name__)
 
 
 class SkipDialogTask(BaseGameTask, TriggerTask):
@@ -20,7 +18,7 @@ class SkipDialogTask(BaseGameTask, TriggerTask):
         if not self.find_one(feature=FeatureList.skip_dialog):
             return
 
-        logger.info("检测到跳过对话框，开始处理")
+        self.log_info("检测到跳过对话框，开始处理")
 
         deadline = self.active_time() + 3
 
