@@ -107,6 +107,7 @@ config = {
         ["src.tasks.onetime.TestScreenshotTask", "TestScreenshotTask"],
         ["src.tasks.test.TestTask", "TestTask"],
         ["src.tasks.test.TestInteractionTask", "TestInteractionTask"],
+        ["src.tasks.test.TestTreasureBandTask", "TestTreasureBandTask"],
     ],
     "custom_tabs": [
         ["src.gui.GlobalConfigTab", "GlobalConfigTab"],
@@ -114,5 +115,6 @@ config = {
     ],
     "trigger_tasks": [  # 不断执行的触发式任务
         ["src.tasks.trigger.SkipDialogTask", "SkipDialogTask"],
+        ["src.tasks.trigger.TreasureUnlockTask", "TreasureUnlockTask"],
     ],
 }
