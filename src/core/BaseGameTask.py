@@ -490,13 +490,21 @@ class BaseGameTask(RuntimeMixin, FrameworkOverrideMixin, BaseTask):
                 return False
 
             self.sleep(0.01)
+    #: 确认按钮需连续稳定该时长才视为「可点」。
+    #: 按钮检测器比模板匹配灵敏，按钮刚开始淡入（尚未可点）时就会命中，
+    #: 此时点击会被游戏丢弃，表现为「第一次点不上、隔一会儿再点才生效」。
+    #: 留一点稳定时间再返回即可跳过这个窗口；调大更稳但更慢。
+    confirm_settle_time = 0.15
+
     def find_confirm(self):
         """查找对话框中的确认按钮，返回匹配的特征或 None。"""
-        frame=self.next_frame()
-        return self.find_button(
-            frame=frame,
+        if confirm := self.find_button(
             box=self.box_of_screen(0.6323,0.7046,0.7193,0.7750),
-        ) or self.find_one(
+            settle_time=self.confirm_settle_time,
+        ):
+            return confirm
+        frame=self.next_frame()
+        return self.find_one(
             feature=[FeatureList.confirm_button, FeatureList.confirm_button_2],
             vertical_variance=0.01,
             horizontal_variance=0.02,
