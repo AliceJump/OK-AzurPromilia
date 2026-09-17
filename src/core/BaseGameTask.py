@@ -492,12 +492,18 @@ class BaseGameTask(RuntimeMixin, FrameworkOverrideMixin, BaseTask):
             self.sleep(0.01)
     def find_confirm(self):
         """查找对话框中的确认按钮，返回匹配的特征或 None。"""
-        return self.find_one(
-            feature=[FeatureList.skip_confirm, FeatureList.confirm_button, FeatureList.confirm_button_2],
+        frame=self.next_frame()
+        return self.find_button(
+            frame=frame,
+            box=self.box_of_screen(0.6323,0.7046,0.7193,0.7750),
+        ) or self.find_one(
+            feature=[FeatureList.confirm_button, FeatureList.confirm_button_2],
             vertical_variance=0.01,
-            horizontal_variance=0.02
+            horizontal_variance=0.02,
+            frame=frame
         ) or self.find_one(
             feature=[FeatureList.confirm_button_2],
-            box=self.box_of_screen(0.5753,0.6116,0.5957,0.6420)
+            box=self.box_of_screen(0.5753,0.6116,0.5957,0.6420),
+            frame=frame
         )
     
