@@ -113,6 +113,6 @@ config = {
         ["src.gui.AccountConfigTab", "AccountConfigTab"],
     ],
     "trigger_tasks": [  # 不断执行的触发式任务
-        ["src.tasks.trigger.ExampleTriggerTask", "ExampleTriggerTask"],
+        ["src.tasks.trigger.SkipDialogTask", "SkipDialogTask"],
     ],
 }
