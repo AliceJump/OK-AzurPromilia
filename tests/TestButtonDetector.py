@@ -5,8 +5,10 @@ import cv2
 import numpy as np
 from ok import Box
 
+import src.core.BaseGameTask as base_game_task_module
 import src.image.button_detector as detector_module
 from src.core.base_mixin.runtime_mixin import RuntimeMixin
+from src.core.BaseGameTask import BaseGameTask
 from src.image.button_detector import (
     DARK_BUTTON_THRESHOLDS,
     DEFAULT_BUTTON_THRESHOLDS,
@@ -96,6 +98,24 @@ class TestButtonDetector(unittest.TestCase):
         self.assertLessEqual(center_x, BUTTON_BOX.x + BUTTON_BOX.width)
         self.assertGreaterEqual(center_y, BUTTON_BOX.y)
         self.assertLessEqual(center_y, BUTTON_BOX.y + BUTTON_BOX.height)
+
+    def test_result_box_is_marked_needs_click_delay(self):
+        """检测器可能在按钮淡入时就命中，结果 Box 要带标记供调用方延后点击。"""
+        frame, _ = _button_frame()
+        result = self.detector.find(frame, BUTTON_BOX)
+        self.assertTrue(getattr(result, "needs_click_delay", False))
+
+    def test_text_box_has_no_delay_marker(self):
+        """只有按钮结果 Box 带标记，文本带不带。"""
+        frame, _ = _button_frame()
+        detection = self.detector.analyze(frame, BUTTON_BOX)
+        self.assertFalse(getattr(detection.text_box, "needs_click_delay", False))
+
+    def test_missed_detection_has_no_box(self):
+        frame, _ = _button_frame(with_text=False)
+        detection = self.detector.analyze(frame, BUTTON_BOX)
+        self.assertFalse(detection.matched)
+        self.assertIsNone(detection.box)
 
     # ── 2. 无按钮 ──────────────────────────────────────────
     def test_no_button_plain_background(self):
@@ -430,90 +450,62 @@ class TestButtonMixin(unittest.TestCase):
         self.assertIn("band_density", detection.metrics)
 
 
-class _FakeClockTask(RuntimeMixin):
-    """带逻辑时钟与逐帧序列的桩：验证 settle_time 的「连续稳定」语义。
+class TestConfirmClickDelay(unittest.TestCase):
+    """只有「按钮检测器命中的」结果才延后点击；模板匹配命中的直接点。"""
 
-    复用 RuntimeMixin 的 find_button / wait_button / button_detector，
-    只把 next_frame / wait_until 换成不真实 sleep 的版本。
-    """
+    @staticmethod
+    def _make_task(delay=0.1):
+        class _Task(BaseGameTask):
+            confirm_click_delay = delay
 
-    def __init__(self, frames, frame_interval=0.05, max_steps=400):
-        self._frames = list(frames)
-        self._frame_interval = frame_interval
-        self._max_steps = max_steps
-        self._index = 0
-        self._clock = 0.0
-        self.frame_calls = 0
+        task = _Task.__new__(_Task)  # 绕开 BaseGameTask 的重量级 __init__
+        task.slept = []
+        task.clicked = []
+        task.sleep = task.slept.append
+        task.click = lambda box, after_sleep=0: task.clicked.append((box, after_sleep))
+        return task
 
-    def next_frame(self):
-        frame = self._frames[min(self._index, len(self._frames) - 1)]
-        self._index += 1
-        self.frame_calls += 1
-        self._clock += self._frame_interval
-        return frame
+    @staticmethod
+    def _detector_box():
+        box = Box(1, 2, 3, 4)
+        box.needs_click_delay = True  # find_button 命中时打的标记
+        return box
 
-    def wait_until(self, condition, time_out=0, pre_action=None, post_action=None, settle_time=-1,
-                   raise_if_not_found=False):
-        if time_out <= 0:
-            time_out = 1.0
-        if settle_time < 0:
-            settle_time = 0
-        start = self._clock
-        settled = None
-        for _ in range(self._max_steps):
-            result = condition()
-            if result:
-                if settled is None:
-                    settled = self._clock
-                elif self._clock - settled >= settle_time:
-                    return result
-            else:
-                settled = None
-            if self._clock - start > time_out:
-                break
-        return None
+    def test_detector_hit_waits_before_click(self):
+        task = self._make_task()
+        box = self._detector_box()
+        task.click_confirm_target(box)
+        self.assertEqual(task.slept, [0.1], "按钮检测器命中的结果应先等待再点击")
+        self.assertEqual(task.clicked, [(box, 0)])
 
+    def test_template_hit_clicks_immediately(self):
+        task = self._make_task()
+        box = Box(1, 2, 3, 4, name="confirm_button_2")  # 模板匹配结果：无标记
+        task.click_confirm_target(box)
+        self.assertEqual(task.slept, [], "模板匹配命中的结果不应等待")
+        self.assertEqual(task.clicked, [(box, 0)])
 
-class TestButtonSettleTime(unittest.TestCase):
-    """按钮淡入期点击会被游戏丢弃，settle_time 用来跳过这段不可点窗口。"""
+    def test_after_sleep_is_forwarded(self):
+        task = self._make_task()
+        task.click_confirm_target(self._detector_box(), after_sleep=0.5)
+        self.assertEqual(task.clicked, [(Box(1, 2, 3, 4), 0.5)])
 
-    def test_without_settle_time_hits_immediately(self):
-        """settle_time=0（默认）时第一帧命中就返回 —— 这就是「点太快」的行为。"""
-        hit_frame, _ = _button_frame()
-        task = _FakeClockTask([hit_frame], frame_interval=0.05)
-        self.assertIsNotNone(task.find_button(BUTTON_BOX))
-        self.assertEqual(task.frame_calls, 1)
+    def test_zero_delay_skips_waiting(self):
+        task = self._make_task(0)
+        task.click_confirm_target(self._detector_box())
+        self.assertEqual(task.slept, [], "confirm_click_delay=0 时不应有任何等待")
+        self.assertEqual(len(task.clicked), 1)
 
-    def test_settle_time_waits_for_consecutive_hits(self):
-        """按钮持续存在时，要连续稳定够 settle_time 才返回。"""
-        hit_frame, _ = _button_frame()
-        task = _FakeClockTask([hit_frame], frame_interval=0.05)
-        result = task.find_button(BUTTON_BOX, settle_time=0.2)
-        self.assertIsNotNone(result)
-        self.assertGreaterEqual(task.frame_calls, 4, "0.2s / 0.05s 至少需要 4 帧")
+    def test_default_delay_is_positive_and_small(self):
+        self.assertGreater(BaseGameTask.confirm_click_delay, 0)
+        self.assertLessEqual(BaseGameTask.confirm_click_delay, 0.5, "点击延迟应保持很小，不能拖慢整体节奏")
 
-    def test_settle_time_ignores_transient_hit(self):
-        """按钮只闪一下（淡入被打断）时，settle_time 不应返回命中。"""
-        hit_frame, _ = _button_frame()
-        frames = [hit_frame] + [_background()] * 40
-        task = _FakeClockTask(frames, frame_interval=0.05)
-        self.assertIsNone(task.find_button(BUTTON_BOX, settle_time=0.2))
-
-    def test_settle_time_returns_none_when_never_stable(self):
-        """按钮始终不出现时，settle_time 走超时返回 None。"""
-        task = _FakeClockTask([_background()], frame_interval=0.05)
-        self.assertIsNone(task.find_button(BUTTON_BOX, settle_time=0.1, time_out=0.3))
-
-    def test_settle_time_does_not_break_box_result(self):
-        """settle_time 返回的仍是可直接 click() 的 Box。"""
-        hit_frame, _ = _button_frame()
-        task = _FakeClockTask([hit_frame], frame_interval=0.05)
-        result = task.find_button(BUTTON_BOX, settle_time=0.1, name="confirm_button")
-        self.assertIsNotNone(result)
-        self.assertEqual(result.name, "confirm_button")
-        center_x, center_y = result.center()
-        self.assertTrue(BUTTON_BOX.x <= center_x <= BUTTON_BOX.x + BUTTON_BOX.width)
-        self.assertTrue(BUTTON_BOX.y <= center_y <= BUTTON_BOX.y + BUTTON_BOX.height)
+    def test_find_confirm_stays_single_frame(self):
+        """检测路径不引入任何等待：find_confirm 里没有 settle。"""
+        source = Path(base_game_task_module.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("confirm_settle_time", source)
+        find_confirm_body = source.split("def find_confirm")[1].split("def click_confirm_target")[0]
+        self.assertNotIn("settle_time", find_confirm_body)
 
 
 if __name__ == "__main__":

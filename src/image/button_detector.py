@@ -277,6 +277,10 @@ class ButtonDetection:
     Attributes:
         matched: 是否命中。
         box: 命中时返回的可直接 ``click()`` 的 Box（即裁剪后的搜索框）。
+            该 Box 带 ``needs_click_delay = True`` 标记：本检测器只要求「中央有文本状的
+            亮色带」，按钮刚出现（淡入尚未可点）时就会命中，此时点击会被游戏丢弃。
+            调用方应在点击前留一点延迟（见 ``BaseGameTask.click_confirm_target``）；
+            模板匹配命中的结果不需要这个延迟，因此没有该标记。
         text_box: 命中的中央文本带（帧坐标），用于调试 / 校准。
         confidence: 0.5~1.0 的置信度。
         failed: 未命中时的原因标识，便于排查阈值。
@@ -457,9 +461,13 @@ class ButtonDetector:
             centroid_y,
         )
         metrics["confidence"] = confidence
+        result_box = Box(x, y, width, height, confidence, name or t.box_name)
+        # 本检测器可能在按钮淡入（尚未可点）时就命中，此时点击会被游戏丢弃；
+        # 打上标记让调用方在点击前留一点延迟。模板匹配命中的结果没有这个标记。
+        result_box.needs_click_delay = True
         return ButtonDetection(
             matched=True,
-            box=Box(x, y, width, height, confidence, name or t.box_name),
+            box=result_box,
             text_box=Box(
                 x + cx0 + band_x0,
                 y + cy0 + band_top,
