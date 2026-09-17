@@ -6,6 +6,7 @@ import numpy as np
 from ok import Box
 
 import src.image.button_detector as detector_module
+from src.core.base_mixin.runtime_mixin import RuntimeMixin
 from src.image.button_detector import (
     DARK_BUTTON_THRESHOLDS,
     DEFAULT_BUTTON_THRESHOLDS,
@@ -319,11 +320,6 @@ class TestButtonMixin(unittest.TestCase):
     """RuntimeMixin 暴露的检测入口（与 find_feature / find_one 风格一致）。"""
 
     def setUp(self):
-        try:
-            from src.core.base_mixin.runtime_mixin import RuntimeMixin
-        except Exception as error:  # pragma: no cover - 环境缺少 GUI 依赖时跳过
-            self.skipTest(f"RuntimeMixin 不可用: {error}")
-
         class _StubTask(RuntimeMixin):
             def __init__(self, frame):
                 self._frame = frame
@@ -432,6 +428,92 @@ class TestButtonMixin(unittest.TestCase):
         detection = self.task.analyze_button(BUTTON_BOX, thresholds=LIGHT_BUTTON_THRESHOLDS)
         self.assertTrue(detection.matched)
         self.assertIn("band_density", detection.metrics)
+
+
+class _FakeClockTask(RuntimeMixin):
+    """带逻辑时钟与逐帧序列的桩：验证 settle_time 的「连续稳定」语义。
+
+    复用 RuntimeMixin 的 find_button / wait_button / button_detector，
+    只把 next_frame / wait_until 换成不真实 sleep 的版本。
+    """
+
+    def __init__(self, frames, frame_interval=0.05, max_steps=400):
+        self._frames = list(frames)
+        self._frame_interval = frame_interval
+        self._max_steps = max_steps
+        self._index = 0
+        self._clock = 0.0
+        self.frame_calls = 0
+
+    def next_frame(self):
+        frame = self._frames[min(self._index, len(self._frames) - 1)]
+        self._index += 1
+        self.frame_calls += 1
+        self._clock += self._frame_interval
+        return frame
+
+    def wait_until(self, condition, time_out=0, pre_action=None, post_action=None, settle_time=-1,
+                   raise_if_not_found=False):
+        if time_out <= 0:
+            time_out = 1.0
+        if settle_time < 0:
+            settle_time = 0
+        start = self._clock
+        settled = None
+        for _ in range(self._max_steps):
+            result = condition()
+            if result:
+                if settled is None:
+                    settled = self._clock
+                elif self._clock - settled >= settle_time:
+                    return result
+            else:
+                settled = None
+            if self._clock - start > time_out:
+                break
+        return None
+
+
+class TestButtonSettleTime(unittest.TestCase):
+    """按钮淡入期点击会被游戏丢弃，settle_time 用来跳过这段不可点窗口。"""
+
+    def test_without_settle_time_hits_immediately(self):
+        """settle_time=0（默认）时第一帧命中就返回 —— 这就是「点太快」的行为。"""
+        hit_frame, _ = _button_frame()
+        task = _FakeClockTask([hit_frame], frame_interval=0.05)
+        self.assertIsNotNone(task.find_button(BUTTON_BOX))
+        self.assertEqual(task.frame_calls, 1)
+
+    def test_settle_time_waits_for_consecutive_hits(self):
+        """按钮持续存在时，要连续稳定够 settle_time 才返回。"""
+        hit_frame, _ = _button_frame()
+        task = _FakeClockTask([hit_frame], frame_interval=0.05)
+        result = task.find_button(BUTTON_BOX, settle_time=0.2)
+        self.assertIsNotNone(result)
+        self.assertGreaterEqual(task.frame_calls, 4, "0.2s / 0.05s 至少需要 4 帧")
+
+    def test_settle_time_ignores_transient_hit(self):
+        """按钮只闪一下（淡入被打断）时，settle_time 不应返回命中。"""
+        hit_frame, _ = _button_frame()
+        frames = [hit_frame] + [_background()] * 40
+        task = _FakeClockTask(frames, frame_interval=0.05)
+        self.assertIsNone(task.find_button(BUTTON_BOX, settle_time=0.2))
+
+    def test_settle_time_returns_none_when_never_stable(self):
+        """按钮始终不出现时，settle_time 走超时返回 None。"""
+        task = _FakeClockTask([_background()], frame_interval=0.05)
+        self.assertIsNone(task.find_button(BUTTON_BOX, settle_time=0.1, time_out=0.3))
+
+    def test_settle_time_does_not_break_box_result(self):
+        """settle_time 返回的仍是可直接 click() 的 Box。"""
+        hit_frame, _ = _button_frame()
+        task = _FakeClockTask([hit_frame], frame_interval=0.05)
+        result = task.find_button(BUTTON_BOX, settle_time=0.1, name="confirm_button")
+        self.assertIsNotNone(result)
+        self.assertEqual(result.name, "confirm_button")
+        center_x, center_y = result.center()
+        self.assertTrue(BUTTON_BOX.x <= center_x <= BUTTON_BOX.x + BUTTON_BOX.width)
+        self.assertTrue(BUTTON_BOX.y <= center_y <= BUTTON_BOX.y + BUTTON_BOX.height)
 
 
 if __name__ == "__main__":
