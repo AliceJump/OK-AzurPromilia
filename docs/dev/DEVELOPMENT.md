@@ -96,12 +96,6 @@ self.find_button(box, thresholds=SKIP_BUTTON)
 - 所有阈值集中在 `ButtonThresholds`，用 `with_(...)` 生成改过的副本，不修改默认值。
 - 传入的 Box 要**贴合按钮**；Box 远大于按钮时文本带相对过薄，会被形状判定拒绝。
 
-  ```python
-  self.find_button(box, settle_time=0.15)   # 连续命中 0.15s 才算命中
-  ```
-
-  `BaseGameTask.confirm_settle_time`（默认 0.15）就是给 `find_confirm()` 用的这个值，按需调大。
-
 ## 配置键迁移
 
 修改 `default_config` 键名时必须先添加迁移表（同一提交完成）：
