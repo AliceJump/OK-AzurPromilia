@@ -19,13 +19,14 @@ def make_bottom_left_black(frame):  # 可选. 某些游戏截图时遮挡UID使�
     """
     try:
         height, width = frame.shape[:2]  # 获取高度和宽度
-
+        # 定义左下角矩形的坐标 (x1, y1, x2, y2)
+        x1, y1, x2, y2 = 0.0859, 0.9778, 0.1297, 0.9981
         # 计算黑色矩形的大小
-        black_width = int(0.072 * width)
-        black_height = int(0.034 * height)
+        black_width = int((x2 - x1) * width)
+        black_height = int((y2 - y1) * height)
 
         # 计算左下角矩形的起始坐标
-        start_x = int(0.054 * width)
+        start_x = int(x1 * width)
         start_y = height - black_height
 
         # 创建黑色矩形 (NumPy 0 数组)
