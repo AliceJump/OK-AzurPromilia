@@ -1,7 +1,8 @@
-"""泛光点击触发任务测试。
+"""辅助星结触发任务测试。
 
-框架调用（截图 / 点击 / 计时 / 覆盖层）全部用 stub 替换，
-只验证「检测 → 点击」这条链路的门槛逻辑；检测本身跑在真实合成帧上，不做假。
+框架调用（截图 / 点击 / 计时 / 覆盖层 / 特征匹配）全部用 stub 替换，
+只验证「星结界面前置 → 检测 → 点击」这条链路的门槛逻辑；
+检测本身跑在真实合成帧上，不做假。
 """
 
 import unittest
@@ -10,7 +11,8 @@ import cv2
 import numpy as np
 from ok import Box
 
-from src.tasks.trigger.GlowClickTask import GlowClickTask
+from src.data.FeatureList import FeatureList
+from src.tasks.trigger.StarLinkAssistTask import StarLinkAssistTask
 
 FRAME_WIDTH, FRAME_HEIGHT = 1920, 1080
 ROI = Box(907, 478, 123, 128)  # 归一化 (0.4724, 0.4426, 0.5365, 0.5611)
@@ -52,16 +54,18 @@ def _make_frame(glow_color=None, solid=False):
 
 
 class TaskHarness:
-    """把 GlowClickTask 从框架里剥出来：假时钟 + 假截图 + 假点击。"""
+    """把 StarLinkAssistTask 从框架里剥出来：假时钟 + 假截图 + 假点击 + 假特征匹配。"""
 
-    def __init__(self, glow_color=None, solid=False, **config_overrides):
+    def __init__(self, glow_color=None, solid=False, star_link=True, **config_overrides):
         self.glow_color = glow_color
         self.solid = solid
+        self.star_link = star_link
         self.now = 0.0
         self.logs: list[str] = []
         self.clicks: list[tuple[int, int]] = []
+        self.features: list[str] = []
 
-        task = GlowClickTask.__new__(GlowClickTask)
+        task = StarLinkAssistTask.__new__(StarLinkAssistTask)
         task.config = dict(DEFAULT_CONFIG)
         task.config.update(config_overrides)
 
@@ -71,11 +75,17 @@ class TaskHarness:
         task._detector_key = None
         task._roi_cache = None
 
+        def _find_feature(feature_name, frame=None, **kwargs):
+            # FeatureList 是 str Enum，取 .value 才是 'star_link_icon'
+            self.features.append(getattr(feature_name, "value", str(feature_name)))
+            return Box(0, 0, 1, 1) if self.star_link else None
+
         task.log_info = lambda message, notify=False: self.logs.append(str(message))
         task.active_time = lambda: self.now
         task.next_frame = lambda: _make_frame(self.glow_color, self.solid)
         task.click = lambda box, **kwargs: self.clicks.append(box.center())
         task.draw_boxes = lambda *args, **kwargs: None
+        task.find_feature = _find_feature
         task.resolution_scale = lambda: 1.0
         task.box_of_screen = lambda x, y, to_x, to_y, name=None, **kwargs: Box(
             round(x * FRAME_WIDTH),
@@ -96,8 +106,34 @@ class TaskHarness:
             self.advance(gap)
 
 
-class TestGlowClickTask(unittest.TestCase):
-    # ── 1. 命中即点击 ───────────────────────────────────────
+class TestStarLinkAssistTask(unittest.TestCase):
+    # ── 1. 星结界面前置闸门 ─────────────────────────────────
+
+    def test_no_click_when_star_link_icon_absent(self):
+        """不在星结界面，就算有可射击光圈也不能点。"""
+        harness = TaskHarness(GREEN_BGR, star_link=False)
+        harness.run(times=3)
+        self.assertEqual(harness.clicks, [])
+
+    def test_clicks_when_star_link_icon_present(self):
+        harness = TaskHarness(GREEN_BGR, star_link=True)
+        harness.run()
+        self.assertEqual(len(harness.clicks), 1)
+
+    def test_gate_uses_star_link_icon_feature(self):
+        """前置闸门查的必须是 star_link_icon，不是别的特征。"""
+        harness = TaskHarness(GREEN_BGR)
+        harness.run()
+        self.assertEqual(harness.features, [FeatureList.star_link_icon.value])
+
+    def test_gate_short_circuits_detection(self):
+        """闸门没过时不该再跑检测：省掉一整轮 HSV + 拟合。"""
+        harness = TaskHarness(GREEN_BGR, star_link=False)
+        harness.run()
+        self.assertEqual(harness.features, [FeatureList.star_link_icon.value])
+        self.assertEqual(harness.clicks, [])
+
+    # ── 2. 命中即点击 ───────────────────────────────────────
 
     def test_clicks_once_on_green_arc(self):
         """点击位置必须是拟合圆心（准心），不是弧的外接框中心。"""
@@ -130,7 +166,7 @@ class TestGlowClickTask(unittest.TestCase):
         harness.run(times=5)
         self.assertEqual(harness.clicks, [])
 
-    # ── 2. 冷却 ─────────────────────────────────────────────
+    # ── 3. 冷却 ─────────────────────────────────────────────
 
     def test_cooldown_prevents_click_storm(self):
         harness = TaskHarness(GREEN_BGR, **{"点击冷却(秒)": 0.35})
@@ -144,7 +180,7 @@ class TestGlowClickTask(unittest.TestCase):
         harness.run()
         self.assertEqual(len(harness.clicks), 2)
 
-    # ── 3. 连续命中帧数 ─────────────────────────────────────
+    # ── 4. 连续命中帧数 ─────────────────────────────────────
 
     def test_streak_gate_delays_first_click(self):
         harness = TaskHarness(GREEN_BGR, **{"连续命中帧数": 3, "点击冷却(秒)": 0.0})
@@ -162,7 +198,7 @@ class TestGlowClickTask(unittest.TestCase):
         harness.run()
         self.assertEqual(harness.clicks, [], "中断后重新计数，尚未达到 3 帧")
 
-    # ── 4. 颜色开关 ─────────────────────────────────────────
+    # ── 5. 颜色开关 ─────────────────────────────────────────
 
     def test_disabled_color_is_not_clicked(self):
         harness = TaskHarness(YELLOW_BGR, **{"检测黄色": False})
@@ -174,7 +210,7 @@ class TestGlowClickTask(unittest.TestCase):
         harness.run()
         self.assertEqual(len(harness.clicks), 1)
 
-    # ── 5. 其他 ─────────────────────────────────────────────
+    # ── 6. 其他 ─────────────────────────────────────────────
 
     def test_no_frame_is_ignored(self):
         harness = TaskHarness(GREEN_BGR)

@@ -1,8 +1,15 @@
-"""环形泛光点击触发式任务。
+"""辅助星结触发式任务。
+
+星结是智慧种族与奇波彼此认可后、通过星结卡缔结的更深一层契约关系。缔结过程中
+需要对准目标射击，本任务就是在这一步代劳：星结界面里光标指向目标时，屏幕中心
+会出现一道彩色可射击光圈（绿 / 黄 / 红，对应不同命中概率），命中即自动点击准心。
 
 流程（每次 ``run()`` 取一帧判定一次，跨调用只保留计数与冷却时间戳）::
 
-    next_frame ──> HSV + 环形结构检测 ROI ──> 命中? ──否──> 清空连续命中计数，返回
+    next_frame ──> 有 star_link_icon? ──否──> 返回（不在星结界面，不干预）
+                                     │ 是
+                                     ↓
+                    HSV + 圆弧拟合检测 ROI ──> 命中? ──否──> 清空连续命中计数，返回
                                      │
                                      是
                                      ↓
@@ -12,13 +19,19 @@
                                      ↓ 否
                           单击左键（圆心）+ 记录冷却时间
 
-检测的是**可射击的光圈 / 弧形标识**（绿 / 黄 / 红），不是任意彩色块：颜色阈值
-之后还会做一次圆弧拟合，只有像素都落在同一个圆上（残差足够小）才算命中，
-背景里的草地、UI、直线光边都不会误判。点击位置取拟合出的**圆心**（即屏幕准心），
-而不是弧的外接框中心 —— 后者会偏向弧的那一侧。
-如果画面里的提示是实心色块，把「要求环形」关掉即可退回色块模式。
+为什么要 star_link_icon 前置
+----------------------------
+可射击光圈只在星结时出现，但屏幕中心那片区域的彩色元素并不少（技能特效、
+场景光斑都可能拟合成圆弧）。用 ``star_link_icon`` 把检测限定在星结界面内，
+等于给后面的颜色 / 形状判据加了一道「场合」闸门，避免在非星结场景乱点。
 
-为什么需要这两个闸门
+为什么检测用圆弧拟合
+--------------------
+那道光圈是**同一个圆上的一段弧**（实测：圆心 ≈ 屏幕中心、半径 ≈ 52px、
+残差 < 1.5px、弧宽 3~6px），不是闭合环，因此不能靠「有没有内孔」判断。
+颜色阈值之后再做一次最小二乘圆拟合，只有像素都落在同一个圆上才算命中。
+
+为什么还需要两个闸门
 --------------------
 * **连续命中帧数**：光效出现 / 消失时有淡入淡出动画，单帧命中可能是过渡帧。
   默认 1 帧（立即点击），画面抖动误点时可上调。
@@ -31,6 +44,7 @@ from __future__ import annotations
 from ok import TriggerTask
 
 from src.core.BaseGameTask import BaseGameTask
+from src.data.FeatureList import FeatureList
 from src.icons import Icons
 from src.image.glow_target_detector import (
     ALL_GLOW_COLORS,
@@ -50,13 +64,16 @@ COLOR_SWITCHES = {
 }
 
 
-class GlowClickTask(BaseGameTask, TriggerTask):
-    """泛光点击触发式任务：在中心区域检测到泛光 / 准心就单击鼠标左键。"""
+class StarLinkAssistTask(BaseGameTask, TriggerTask):
+    """辅助星结触发式任务：星结界面出现可射击光圈时自动点击屏幕准心。"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.name = "泛光点击"
-        self.description = "在屏幕中心区域检测红/黄/绿环形泛光或特殊准心，命中即单击鼠标左键。"
+        self.name = "辅助星结"
+        self.description = (
+            "星结辅助触发式任务：缔结星结时，光标指向目标出现可射击光圈，"
+            "自动点击屏幕准心完成射击。"
+        )
         self.icon = Icons.Trigger
         self.trigger_interval = 0  # 每轮都参与，靠自身冷却限流
 
@@ -91,6 +108,11 @@ class GlowClickTask(BaseGameTask, TriggerTask):
     def run(self):
         frame = self.next_frame()
         if frame is None:
+            return
+
+        # 前置闸门：不在星结界面就完全不干预，后面所有判据都不必跑。
+        if not self.find_feature(feature_name=FeatureList.star_link_icon, frame=frame):
+            self._streak = 0
             return
 
         detection = self._detector().analyze(frame, self._roi())
