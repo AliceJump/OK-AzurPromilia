@@ -31,9 +31,6 @@ msgstr "Prueba de captura"
 msgid "就绪"
 msgstr "Listo"
 
-msgid "框架自检"
-msgstr "Autocomprobación del marco"
-
 msgid "每行一个账号名，无需密码"
 msgstr "Un nombre de cuenta por línea, sin contraseña"
 
@@ -64,19 +61,13 @@ msgstr "Tarea"
 msgid "任务属性配置"
 msgstr "Configuración de atributos de tarea"
 
-msgid "示例触发任务"
-msgstr "Tarea de activación de ejemplo"
-
-msgid "示例任务"
-msgstr "Tarea de ejemplo"
-
 msgid "选择任务后自动渲染属性控件"
 msgstr "Representa los widgets de atributos tras seleccionar una tarea"
 
 msgid "已保存当前账号配置"
 msgstr "Configuración de cuenta actual guardada"
 
-msgid "已保存账号列表（新建 {created}，复用 {reused}）"
+msgid "账号列表已保存（新建 {created}，复用 {reused}）"
 msgstr "Lista de cuentas guardada (creadas {created}, reutilizadas {reused})"
 
 msgid "已清空：{account} / {task} 覆盖"
@@ -133,3 +124,21 @@ msgstr "Tecla de mapa"
 msgid "SingleActionWithDelay"
 msgstr "SingleActionWithDelay"
 
+msgid "跳剧情"
+msgstr "Saltar diálogo"
+
+msgid "跳过剧情触发式任务：自动点击跳过对话框和确认按钮。"
+msgstr "Tarea de activación para saltar diálogos: hace clic automáticamente en los botones de saltar diálogo y confirmar."
+
+
+msgid "辅助星结"
+msgstr "Asistencia de Vínculo Estelar"
+
+msgid "星结辅助触发式任务：缔结星结时，光标指向目标出现可射击光圈，自动点击屏幕准心完成射击。"
+msgstr "Tarea de activación de asistencia de Vínculo Estelar: al forjar un Vínculo Estelar, hace clic automáticamente en la mira para disparar cuando aparece el anillo de disparo sobre el objetivo."
+
+msgid "宝箱开锁"
+msgstr "Desbloqueo de cofres"
+
+msgid "宝箱开锁触发式任务：校准颜色条带后按钥匙位置逐个点击开锁。"
+msgstr "Tarea de activación de desbloqueo de cofres: tras calibrar las bandas de color, hace clic en cada posición de llave para desbloquear."

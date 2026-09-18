@@ -8,3 +8,8 @@ class FeatureList(str, Enum):
     confirm_button_2 = 'confirm_button_2'
     login_in = 'login_in'
     login_out = 'login_out'
+    skip_confirm = 'skip_confirm'
+    skip_dialog = 'skip_dialog'
+    star_link_icon = 'star_link_icon'
+    treasure_icon = 'treasure_icon'
+    treasure_key_icon = 'treasure_key_icon'

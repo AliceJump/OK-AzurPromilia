@@ -19,13 +19,14 @@ def make_bottom_left_black(frame):  # 可选. 某些游戏截图时遮挡UID使�
     """
     try:
         height, width = frame.shape[:2]  # 获取高度和宽度
-
+        # 定义左下角矩形的坐标 (x1, y1, x2, y2)
+        x1, y1, x2, y2 = 0.0859, 0.9778, 0.1297, 0.9981
         # 计算黑色矩形的大小
-        black_width = int(0.072 * width)
-        black_height = int(0.034 * height)
+        black_width = int((x2 - x1) * width)
+        black_height = int((y2 - y1) * height)
 
         # 计算左下角矩形的起始坐标
-        start_x = int(0.054 * width)
+        start_x = int(x1 * width)
         start_y = height - black_height
 
         # 创建黑色矩形 (NumPy 0 数组)
@@ -71,6 +72,7 @@ config = {
     },
     "windows": {  # Windows游戏请填写此设置
         "exe": ["AzurPromilia.exe"],  # 蓝色星原：旅谣 (Azur Promilia)
+        "args": ["-start=azurpromilia_launcher"],  # 启动参数，支持多个
         'hwnd_class': 'UnityWndClass',  # 增加重名检查准确度
         # GUI 需要可迭代配置；设备管理器需要类对象，使用包装器同时满足两者。
         "interaction": [GameInteraction],
@@ -101,16 +103,17 @@ config = {
     "my_app": ["src.globals", "Globals"],  # 可选. 全局单例对象, 可以存放加载的模型, 使用og.my_app调用
     "onetime_tasks": [  # 用户点击触发的任务（一次性业务任务在前，调试/测试任务在后）
         ["src.tasks.onetime.DailyTask", "DailyTask"],
-        ["src.tasks.onetime.ExampleTask", "ExampleTask"],
         ["src.tasks.onetime.TestScreenshotTask", "TestScreenshotTask"],
-        ["src.tasks.test.TestTask", "TestTask"],
         ["src.tasks.test.TestInteractionTask", "TestInteractionTask"],
+        ["src.tasks.test.TestTreasureBandTask", "TestTreasureBandTask"],
     ],
     "custom_tabs": [
         ["src.gui.GlobalConfigTab", "GlobalConfigTab"],
         ["src.gui.AccountConfigTab", "AccountConfigTab"],
     ],
     "trigger_tasks": [  # 不断执行的触发式任务
-        ["src.tasks.trigger.ExampleTriggerTask", "ExampleTriggerTask"],
+        ["src.tasks.trigger.SkipDialogTask", "SkipDialogTask"],
+        ["src.tasks.trigger.StarLinkAssistTask", "StarLinkAssistTask"],
+        ["src.tasks.trigger.TreasureUnlockTask", "TreasureUnlockTask"],
     ],
 }

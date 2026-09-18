@@ -14,6 +14,12 @@ from ok import Box
 from src.config import config as app_config
 from src.core.global_config_store import KEY_CONFIG_NAME, get_global_config
 from src.data.FeatureList import FeatureList as fL
+from src.image.button_detector import (
+    DEFAULT_BUTTON_THRESHOLDS,
+    ButtonDetection,
+    ButtonDetector,
+    ButtonThresholds,
+)
 from src.image.frame_processes import isolate_by_hsv_ranges
 from src.interaction.Key import move_keys as send_move_keys
 from src.interaction.KeyConfig import KeyConfigManager
@@ -556,6 +562,176 @@ class RuntimeMixin:
             invert=invert,
             kernel_size=kernel_size,
         )
+
+    # ── 按钮检测：固定 Box + 中央文本带（无 OCR） ───────────────
+
+    def button_detector(self, thresholds: ButtonThresholds | None = None) -> ButtonDetector:
+        """返回可复用的按钮检测器实例（避免逐帧重建）。
+
+        Args:
+            thresholds: 自定义阈值；传入时返回一次性实例，不覆盖缓存的默认实例。
+
+        Returns:
+            ButtonDetector: 检测器实例。
+        """
+        if thresholds is not None:
+            return ButtonDetector(thresholds)
+        detector = getattr(self, "_button_detector", None)
+        if detector is None:
+            detector = ButtonDetector()
+            self._button_detector = detector
+        return detector
+
+    def find_button(
+        self,
+        box,
+        frame=None,
+        name: str | None = None,
+        thresholds: ButtonThresholds | None = None,
+        text_hsv=None,
+        backdrop_hsv=None,
+        require_backdrop: bool | None = None,
+    ):
+        """在固定 Box 内检测按钮是否出现，不使用 OCR。
+
+        只认两件事的颜色，其余都是结构判据（位置 / 形状 / 数量）：
+
+        * ``text_hsv``     —— 文字（前景）颜色区间，**主特征**；
+        * ``backdrop_hsv`` —— 底色（背景）颜色区间，可选辅助特征。
+
+        可以直接传颜色，也可以传封装好的语义阈值常量::
+
+            self.find_button(box, text_hsv=((0, 0, 170), (180, 100, 255)))
+            self.find_button(box, thresholds=SKIP_BUTTON)
+
+        Args:
+            box: 按钮所在区域（由 box_of_screen / box_of_screen_scaled 生成）。
+            frame: 输入帧，缺省取 self.next_frame()。
+            name: 结果 Box 的名称。
+            thresholds: 完整阈值（可由 ButtonThresholds.for_button 生成后复用）。
+            text_hsv: 文字颜色区间 ((h,s,v), (h,s,v))，覆盖 thresholds 中的设置。
+            backdrop_hsv: 底色区间；传入即默认开启底色校验。
+            require_backdrop: 显式指定是否校验底色。
+
+        Returns:
+            Box | None: 命中返回可直接 click() 的 Box，未命中返回 None。
+        """
+        frame = frame if frame is not None else self.next_frame()
+        if frame is None:
+            return None
+        thresholds = self._resolve_button_thresholds(thresholds, text_hsv, backdrop_hsv, require_backdrop)
+        return self.button_detector(thresholds).find(frame, box, name=name)
+
+    def find_buttons(
+        self,
+        boxes,
+        frame=None,
+        name: str | None = None,
+        thresholds: ButtonThresholds | None = None,
+        text_hsv=None,
+        backdrop_hsv=None,
+        require_backdrop: bool | None = None,
+    ):
+        """在多个候选 Box 中依次检测，返回首个命中结果。
+
+        Args:
+            boxes: 候选 Box 列表。
+            frame: 输入帧，缺省取 self.next_frame()。
+            name: 结果 Box 的名称。
+            thresholds: 完整阈值。
+            text_hsv: 文字颜色区间。
+            backdrop_hsv: 底色区间；传入即默认开启底色校验。
+            require_backdrop: 显式指定是否校验底色。
+
+        Returns:
+            Box | None: 首个命中的 Box，全部未命中返回 None。
+        """
+        frame = frame if frame is not None else self.next_frame()
+        if frame is None:
+            return None
+        thresholds = self._resolve_button_thresholds(thresholds, text_hsv, backdrop_hsv, require_backdrop)
+        detector = self.button_detector(thresholds)
+        for box in boxes or []:
+            if result := detector.find(frame, box, name=name):
+                return result
+        return None
+
+    def analyze_button(
+        self,
+        box,
+        frame=None,
+        name: str | None = None,
+        thresholds: ButtonThresholds | None = None,
+        text_hsv=None,
+        backdrop_hsv=None,
+        require_backdrop: bool | None = None,
+    ) -> ButtonDetection:
+        """返回完整检测结果（含中间指标与未命中原因），用于校准阈值与排查。
+
+        Args:
+            box: 按钮所在区域。
+            frame: 输入帧，缺省取 self.next_frame()。
+            name: 结果 Box 的名称。
+            thresholds: 完整阈值。
+            text_hsv: 文字颜色区间。
+            backdrop_hsv: 底色区间；传入即默认开启底色校验。
+            require_backdrop: 显式指定是否校验底色。
+
+        Returns:
+            ButtonDetection: 检测结果。
+        """
+        frame = frame if frame is not None else self.next_frame()
+        if frame is None:
+            return ButtonDetection(False, failed="empty_frame")
+        thresholds = self._resolve_button_thresholds(thresholds, text_hsv, backdrop_hsv, require_backdrop)
+        return self.button_detector(thresholds).analyze(frame, box, name=name)
+
+    def wait_button(
+        self,
+        box,
+        time_out: float = 5,
+        settle_time: float = -1,
+        name: str | None = None,
+        thresholds: ButtonThresholds | None = None,
+        text_hsv=None,
+        backdrop_hsv=None,
+        require_backdrop: bool | None = None,
+    ):
+        """等待固定 Box 内出现按钮，以视觉状态为准而非固定延时。
+
+        Args:
+            box: 按钮所在区域。
+            time_out: 最长等待时间。
+            settle_time: 命中后需要保持稳定的时长。
+            name: 结果 Box 的名称。
+            thresholds: 完整阈值。
+            text_hsv: 文字颜色区间。
+            backdrop_hsv: 底色区间；传入即默认开启底色校验。
+            require_backdrop: 显式指定是否校验底色。
+
+        Returns:
+            Box | None: 命中返回 Box，超时返回 None。
+        """
+        return self.wait_until(
+            lambda: self.find_button(
+                box,
+                name=name,
+                thresholds=thresholds,
+                text_hsv=text_hsv,
+                backdrop_hsv=backdrop_hsv,
+                require_backdrop=require_backdrop,
+            ),
+            time_out=time_out,
+            settle_time=settle_time,
+            raise_if_not_found=False,
+        )
+
+    def _resolve_button_thresholds(self, thresholds, text_hsv, backdrop_hsv, require_backdrop):
+        """把便捷颜色参数合并进阈值；没有任何颜色参数时原样返回。"""
+        if text_hsv is None and backdrop_hsv is None and require_backdrop is None:
+            return thresholds
+        base = thresholds or DEFAULT_BUTTON_THRESHOLDS
+        return base.with_button_colors(text_hsv, backdrop_hsv, require_backdrop)
 
     def _is_debug_overlay_enabled(self) -> bool:
         config_holders = (

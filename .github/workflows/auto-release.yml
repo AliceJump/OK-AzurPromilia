@@ -2,7 +2,6 @@ name: Auto Release
 
 on:
   schedule:
-    # 每日北京时间 0:00（= UTC 16:00，GitHub Actions 的 cron 使用 UTC）
     - cron: "0 16 * * *"
   workflow_dispatch:
 
@@ -16,17 +15,18 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Check changes in deploy.txt paths since last tag
         id: check
         run: |
           set -euo pipefail
 
-          # deploy.txt 每行一个「发版关注路径」（目录或文件），支持 CRLF，空行忽略
           mapfile -t paths < deploy.txt
           watched=()
           for line in "${paths[@]}"; do
@@ -42,6 +42,8 @@ jobs:
 
           if [ "${#watched[@]}" -eq 0 ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "latest_commit=" >> "$GITHUB_OUTPUT"
+            echo "no watched paths in deploy.txt; skip release"
             exit 0
           fi
 
@@ -53,6 +55,7 @@ jobs:
 
           if [ -z "$latest_commit" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "latest_commit=" >> "$GITHUB_OUTPUT"
             echo "no changes in watched paths; skip release"
             exit 0
           fi
@@ -70,7 +73,14 @@ jobs:
             next="v0.1.0"
           else
             version="${last_tag#v}"
-            IFS='.' read -r major minor patch <<< "$version"
+            if [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+              major="${BASH_REMATCH[1]}"
+              minor="${BASH_REMATCH[2]}"
+              patch="${BASH_REMATCH[3]}"
+            else
+              echo "invalid last_tag format: $last_tag" >&2
+              exit 1
+            fi
             if [ "$patch" -ge 99 ]; then
               patch=0
               minor=$((minor + 1))
