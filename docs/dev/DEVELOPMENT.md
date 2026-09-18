@@ -18,7 +18,7 @@
 | `src/core/config_migration.py` | 配置键迁移工具（改键名时使用，防丢用户配置） |
 | `src/core/global_config_store.py` | 本项目自建的全局配置（**不走框架的 `config['global_configs']`**） |
 | `src/interaction/` | 窗口与键鼠：`GameInteraction`（自定义后台输入）、`Mouse`、`ScreenPosition`、`KeyConfig` |
-| `src/image/` | 图像算法：`rotated_template`（旋转模板匹配）、`stability`（图像指纹）、`frame_processes`、`hsv_config`、`button_detector`（固定 Box 按钮检测，无 OCR） |
+| `src/image/` | 图像算法：`rotated_template`（旋转模板匹配）、`stability`（图像指纹）、`frame_processes`、`hsv_config`、`button_detector`（固定 Box 按钮检测，无 OCR）、`glow_target_detector`（可射击光圈，HSV+圆弧拟合） |
 | `src/yolo/` | YOLO 模型注册（`models.py`）与 OpenVINO 推理 |
 | `src/tasks/onetime/` | 一次性任务 |
 | `src/tasks/trigger/` | 触发式任务 |
@@ -95,6 +95,71 @@ self.find_button(box, thresholds=SKIP_BUTTON)
   只用文字特征误报 17，加上底色区间后 0，命中率不变，单次 +0.07 ms。按需开启。
 - 所有阈值集中在 `ButtonThresholds`，用 `with_(...)` 生成改过的副本，不修改默认值。
 - 传入的 Box 要**贴合按钮**；Box 远大于按钮时文本带相对过薄，会被形状判定拒绝。
+
+## 辅助星结：可射击光圈检测与辅助任务
+
+星结时（智慧种族与奇波通过星结卡缔结契约），光标指向目标会在屏幕中心出现一道
+彩色光圈作为可射击标识：绿（100%）、金黄（48.3%）、橙红（1.4%）对应不同命中概率。
+
+### 检测器 `src/image/glow_target_detector.py`
+
+关键是**这道光圈是同一圆上的一段弧，不是闭合圆环**，所以不能靠「有没有内孔」判断。
+1920×1080 三张样本实测：圆心 ≈ 屏幕中心 `(963, 541)`、半径 ≈ 52px、圆拟合残差 < 1.5px、
+弧宽 3~6px —— 三张是同一个圆。
+
+流程：`Box → ROI → HSV inRange(S≥110, V≥190) → 3x3 闭运算 → 连通域 → 最小二乘圆拟合 → 判据过滤`
+
+判据（默认，`GlowThresholds`）：
+
+| 判据 | 默认值 | 作用 |
+|------|--------|------|
+| 残差 ≤ `max_residual` 且 ≤ `max_residual_ratio × 半径` | 6px / 0.12 | 「是不是圆」的核心，噪声与色块拟合不出低残差小圆 |
+| 内切厚度 ≤ `max_thickness_ratio × 半径` | 0.35 | 排除实心圆盘（见下） |
+| 半径 ∈ [`min_radius`, `max_radius`] | 30 ~ 90 | 直线会拟合出半径上千的圆，由上限挡掉 |
+| 跨度（外接框对角线）≥ `min_span` | 40 | 排除小碎点 |
+| 圆心落在 ROI 内 | 开 | 避免误检画面别处的大圆弧 |
+
+```python
+from src.image.glow_target_detector import GlowTargetDetector
+
+detector = GlowTargetDetector()                    # 复用实例，不要逐帧新建
+roi = self.box_of_screen(0.4724, 0.4426, 0.5365, 0.5611)
+
+result = detector.analyze(frame, roi)              # 含残差 / 半径 / 厚度 / 未命中原因
+box = detector.find(frame, roi)                    # 命中的帧坐标 Box，可直接 click()
+```
+
+两个容易踩的点：
+
+- **厚度判据不能省。** 实心圆盘的**外轮廓本身就是一个完美圆**，只比残差会把圆盘判成环；
+  加上「内切厚度 ≤ 0.35×半径」才能区分（真实弧带 3px / 半径 52px ≈ 0.06，圆盘 ≈ 1.0）。
+- **厚度必须在连通域像素上算，不能用轮廓填充。** 闭合光环一填充就变成实心盘，
+  厚度立刻从「半环宽」跳到「半径」，把真目标误杀。
+
+**点击位置取拟合出的圆心**，不是外接框中心：弧只是圆的一段（往往只有右侧 90°~120°），
+框中心会偏向弧那一侧，而圆心就是屏幕准心。`GlowDetection.center` 给出这个坐标。
+
+`require_arc=False` 可退回「最大彩色团块」模式，用于提示本身是实心色块的画面。
+
+### 任务 `src/tasks/trigger/StarLinkAssistTask.py`
+
+触发式任务，`run()` 里三道闸门依次短路：
+
+```text
+star_link_icon 存在? ──否──> 返回（不在星结界面，不干预）
+        │ 是
+        ↓
+  圆弧拟合命中? ──否──> 清空连续命中计数，返回
+        │ 是
+        ↓
+  连续命中帧数 / 点击冷却 ──> 单击左键（圆心）
+```
+
+- **前置闸门** `find_feature(feature_name=FeatureList.star_link_icon, frame=frame)`：
+  屏幕中心那片区域彩色元素不少（技能特效、场景光斑都可能拟合成圆弧），用「场合」
+  把检测限定在星结界面内。这里显式传 `frame` 复用同一帧，不用 `find_one()`（会再取一帧）。
+- **连续命中帧数**过滤光圈淡入淡出的过渡帧；**点击冷却**防止一次提示被点成连击。
+- 尺寸类阈值（面积按平方、半径与跨度按线性）随 `resolution_scale()` 换算。
 
 ## 配置键迁移
 

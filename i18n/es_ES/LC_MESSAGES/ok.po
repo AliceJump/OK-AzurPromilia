@@ -139,3 +139,9 @@ msgstr "Saltar diálogo"
 msgid "跳过剧情触发式任务：自动点击跳过对话框和确认按钮。"
 msgstr "Tarea de activación para saltar diálogos: hace clic automáticamente en los botones de saltar diálogo y confirmar."
 
+
+msgid "辅助星结"
+msgstr "Asistencia de Vínculo Estelar"
+
+msgid "星结辅助触发式任务：缔结星结时，光标指向目标出现可射击光圈，自动点击屏幕准心完成射击。"
+msgstr "Tarea de activación de asistencia de Vínculo Estelar: al forjar un Vínculo Estelar, hace clic automáticamente en la mira para disparar cuando aparece el anillo de disparo sobre el objetivo."
