@@ -18,7 +18,7 @@
 | `src/core/config_migration.py` | 配置键迁移工具（改键名时使用，防丢用户配置） |
 | `src/core/global_config_store.py` | 本项目自建的全局配置（**不走框架的 `config['global_configs']`**） |
 | `src/interaction/` | 窗口与键鼠：`GameInteraction`（自定义后台输入）、`Mouse`、`ScreenPosition`、`KeyConfig` |
-| `src/image/` | 图像算法：`rotated_template`（旋转模板匹配）、`stability`（图像指纹）、`frame_processes`、`hsv_config`、`treasure_band_detector`（开锁颜色带，HSV+连通域） |
+| `src/image/` | 图像算法：`rotated_template`（旋转模板匹配）、`stability`（图像指纹）、`frame_processes`、`hsv_config`、`button_detector`（固定 Box 按钮检测，无 OCR）、`treasure_band_detector`（开锁颜色带，HSV+连通域） |
 | `src/yolo/` | YOLO 模型注册（`models.py`）与 OpenVINO 推理 |
 | `src/tasks/onetime/` | 一次性任务 |
 | `src/tasks/trigger/` | 触发式任务 |
@@ -108,6 +108,62 @@ WAIT_TREASURE ──treasure_icon──> CALIBRATING_BANDS ──连续多帧稳
 
 调试任务 `src/tasks/test/TestTreasureBandTask.py` 会在覆盖层实时画框
 （红=命中 / 绿=ROI / 蓝=被过滤），用来肉眼校准阈值。
+
+## 固定 Box 按钮检测（中央文本带，无 OCR）
+
+部分按钮（如「跳过剧情 / 确认」）底色为深灰 `RGB(50,50,53)`，与游戏背景几乎一致，
+模板匹配和「整块颜色判定」都不稳定。这类按钮的可靠特征是**按钮中央的文字**。
+
+`src/image/button_detector.py` 检测「Box 中央是否存在一条颜色落在指定 HSV 区间内的文本带」，
+**只有两个颜色参数**：
+
+- `text_hsv` —— 文字（前景）颜色区间，**主特征**；
+- `backdrop_hsv` —— 底色（背景）颜色区间，**可选辅助特征**。
+
+入口挂在 `RuntimeMixin` 上：
+
+```python
+box = self.box_of_screen(0.575, 0.61, 0.64, 0.64)
+if result := self.find_button(box):      # 默认 = 深灰底 + 亮色文字
+    self.click(result)                   # 结果可直接点击
+
+# 直接传颜色
+self.find_button(box, text_hsv=((0, 0, 170), (180, 100, 255)))
+self.find_button(box, text_hsv=((0, 0, 0), (180, 255, 90)),
+                      backdrop_hsv=((0, 0, 170), (180, 80, 255)))
+
+# 或封装成语义常量复用
+from src.image.button_detector import ButtonThresholds
+SKIP_BUTTON = ButtonThresholds.for_button(
+    ((0, 0, 170), (180, 100, 255)),   # 文字：亮色
+    ((0, 0, 30), (180, 80, 110)),     # 底色：深灰
+    name="skip_button",
+)
+self.find_button(box, thresholds=SKIP_BUTTON)
+```
+
+| 方法 | 返回 | 说明 |
+|------|------|------|
+| `find_button(box, frame=None, thresholds=None, text_hsv=None, backdrop_hsv=None)` | `Box \| None` | 命中返回可直接 `click()` 的 Box |
+| `find_buttons(boxes, ...)` | `Box \| None` | 多个候选 Box，返回首个命中 |
+| `wait_button(box, time_out=5, ...)` | `Box \| None` | 以视觉状态等待，不用固定延时 |
+| `analyze_button(box, ...)` | `ButtonDetection` | 含中间指标与未命中原因，用于校准阈值 |
+| `button_detector(thresholds=None)` | `ButtonDetector` | 缓存的检测器实例 |
+
+预设（`ButtonThresholds` 的类方法 / 常量）：
+
+| 预设 | 文字 HSV | 底色 HSV | 适用 |
+|------|----------|----------|------|
+| `DARK_BUTTON_THRESHOLDS` / `DEFAULT_BUTTON_THRESHOLDS`（默认） | `(0,0,170)~(180,100,255)` | `(0,0,30)~(180,80,110)` | 深灰 / 黑底 + 亮字 |
+| `LIGHT_BUTTON_THRESHOLDS` | `(0,0,0)~(180,255,90)` | `(0,0,170)~(180,80,255)` | 亮 / 白底 + 深字（默认校验底色） |
+| `for_button(text_hsv, backdrop_hsv, name=...)` | 任意 | 可选 | 封装任意语义按钮 |
+
+要点：
+
+- 底色区间**只在 Box 不够贴合按钮时才明显生效**：真实 1080P 截图滑窗 884 个位置实测，
+  只用文字特征误报 17，加上底色区间后 0，命中率不变，单次 +0.07 ms。按需开启。
+- 所有阈值集中在 `ButtonThresholds`，用 `with_(...)` 生成改过的副本，不修改默认值。
+- 传入的 Box 要**贴合按钮**；Box 远大于按钮时文本带相对过薄，会被形状判定拒绝。
 
 ## 配置键迁移
 
