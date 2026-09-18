@@ -137,6 +137,19 @@
       ],
       "area": 567,
       "iscrowd": 0
+    },
+    {
+      "id": 11,
+      "image_id": 1,
+      "category_id": 11,
+      "bbox": [
+        1723,
+        960,
+        22,
+        29
+      ],
+      "area": 638,
+      "iscrowd": 0
     }
   ],
   "categories": [
@@ -182,6 +195,11 @@
     {
       "id": 10,
       "name": "treasure_key_icon",
+      "supercategory": ""
+    },
+    {
+      "id": 11,
+      "name": "star_link_icon",
       "supercategory": ""
     }
   ]
