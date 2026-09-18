@@ -20,7 +20,8 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
+          token: ${{ secrets.OK_GH || github.token }}
 
       - name: Check changes in deploy.txt paths since last tag
         id: check
@@ -94,7 +95,7 @@ jobs:
       - name: Create and push version tag
         if: steps.check.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.OK_GH || github.token }}
         run: |
           set -euo pipefail
           next="${{ steps.version.outputs.next }}"
@@ -108,7 +109,7 @@ jobs:
       - name: Trigger Build via repository_dispatch
         if: steps.check.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.OK_GH || github.token }}
         run: |
           set -euo pipefail
           next="${{ steps.version.outputs.next }}"
