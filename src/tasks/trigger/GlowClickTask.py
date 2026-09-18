@@ -1,8 +1,8 @@
-"""泛光点击触发式任务。
+"""环形泛光点击触发式任务。
 
 流程（每次 ``run()`` 取一帧判定一次，跨调用只保留计数与冷却时间戳）::
 
-    next_frame ──> HSV 检测 ROI ──> 命中? ──否──> 清空连续命中计数，返回
+    next_frame ──> HSV + 环形结构检测 ROI ──> 命中? ──否──> 清空连续命中计数，返回
                                      │
                                      是
                                      ↓
@@ -10,7 +10,13 @@
                                      ↓ 达到
                               冷却未到? ──是──> 返回（不重复点击）
                                      ↓ 否
-                          单击左键（框中心）+ 记录冷却时间
+                          单击左键（圆心）+ 记录冷却时间
+
+检测的是**可射击的光圈 / 弧形标识**（绿 / 黄 / 红），不是任意彩色块：颜色阈值
+之后还会做一次圆弧拟合，只有像素都落在同一个圆上（残差足够小）才算命中，
+背景里的草地、UI、直线光边都不会误判。点击位置取拟合出的**圆心**（即屏幕准心），
+而不是弧的外接框中心 —— 后者会偏向弧的那一侧。
+如果画面里的提示是实心色块，把「要求环形」关掉即可退回色块模式。
 
 为什么需要这两个闸门
 --------------------
@@ -50,7 +56,7 @@ class GlowClickTask(BaseGameTask, TriggerTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = "泛光点击"
-        self.description = "在屏幕中心区域检测红/黄/绿泛光或特殊准心，命中即单击鼠标左键。"
+        self.description = "在屏幕中心区域检测红/黄/绿环形泛光或特殊准心，命中即单击鼠标左键。"
         self.icon = Icons.Trigger
         self.trigger_interval = 0  # 每轮都参与，靠自身冷却限流
 
@@ -58,6 +64,7 @@ class GlowClickTask(BaseGameTask, TriggerTask):
             "检测绿色": True,
             "检测黄色": True,
             "检测红色": True,
+            "要求环形": True,
             "最小面积": 60,
             "连续命中帧数": 1,
             "点击冷却(秒)": 0.35,
@@ -67,7 +74,8 @@ class GlowClickTask(BaseGameTask, TriggerTask):
             "画调试框": True,
         }
         self.config_description.update({
-            "最小面积": "连通域面积下限（像素），按 1920x1080 为基准，随分辨率自动缩放。",
+            "要求环形": "只认圆环形 / 弧形的彩色光效（可射击标识）；关掉后退回「最大彩色团块」模式，可匹配实心提示。",
+            "最小面积": "光效像素数下限，按 1920x1080 为基准，随分辨率自动缩放。",
             "连续命中帧数": "连续多少帧命中才点击，用于过滤淡入淡出的过渡帧。",
             "点击冷却(秒)": "两次点击之间的最短间隔，防止一次提示被点成连击。",
         })
@@ -110,7 +118,11 @@ class GlowClickTask(BaseGameTask, TriggerTask):
         if self.config.get("记录点击日志", True):
             label = GLOW_COLOR_LABELS.get(detection.color, detection.color)
             center = detection.box.center()
-            self.log_info(f"检测到{label}泛光，点击 ({center[0]}, {center[1]})")
+            shape = "光圈" if detection.is_arc else "色块"
+            self.log_info(
+                f"检测到{label}可射击{shape}（半径 {detection.radius:.0f}px，"
+                f"残差 {detection.residual:.1f}px），点击 ({center[0]}, {center[1]})"
+            )
 
     # ── 工具 ────────────────────────────────────────────────
 
@@ -122,15 +134,25 @@ class GlowClickTask(BaseGameTask, TriggerTask):
         return self._roi_cache
 
     def _detector(self) -> GlowTargetDetector:
-        """按当前配置（颜色开关 + 分辨率缩放后的面积阈值）取检测器实例。"""
+        """按当前配置（颜色开关 + 环形要求 + 分辨率缩放后的面积阈值）取检测器实例。"""
         colors = tuple(color for key, color in COLOR_SWITCHES.items() if self.config.get(key, True))
         if not colors:
             colors = ALL_GLOW_COLORS
+        scale = self.resolution_scale()
         min_area = max(20, round(float(self.config.get("最小面积", 60)) * self._area_scale()))
-        key = (colors, min_area)
+        require_arc = bool(self.config.get("要求环形", True))
+        # 半径 / 跨度同样随分辨率线性缩放：4K 下的光圈本身就比 1080p 大一圈。
+        overrides = {
+            "min_area": min_area,
+            "require_arc": require_arc,
+            "min_radius": DEFAULT_GLOW_THRESHOLDS.min_radius * scale,
+            "max_radius": DEFAULT_GLOW_THRESHOLDS.max_radius * scale,
+            "min_span": DEFAULT_GLOW_THRESHOLDS.min_span * scale,
+        }
+        key = (colors, *overrides.values())
         if self._detector_cache is None or self._detector_key != key:
             self._detector_cache = GlowTargetDetector(
-                DEFAULT_GLOW_THRESHOLDS.with_(min_area=min_area), colors=colors
+                DEFAULT_GLOW_THRESHOLDS.with_(**overrides), colors=colors
             )
             self._detector_key = key
         return self._detector_cache

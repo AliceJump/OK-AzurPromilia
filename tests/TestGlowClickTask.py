@@ -19,13 +19,15 @@ BACKGROUND_BGR = (30, 30, 30)
 GREEN_BGR = (0, 255, 0)  # BGR，HSV 约 (60, 255, 255)
 YELLOW_BGR = (0, 255, 255)  # BGR，HSV 约 (30, 255, 255)
 
-# ROI 内的一块泛光
-GLOW_RECT = (947, 527, 30, 30)
+# ROI 中心的一道可射击弧：半径 52、右侧 120°、弧宽 5（与真实样本同量级）
+ARC_CENTER = (962, 542)
+ARC_RADIUS = 52
 
 DEFAULT_CONFIG = {
     "检测绿色": True,
     "检测黄色": True,
     "检测红色": True,
+    "要求环形": True,
     "最小面积": 60,
     "连续命中帧数": 1,
     "点击冷却(秒)": 0.35,
@@ -36,19 +38,25 @@ DEFAULT_CONFIG = {
 }
 
 
-def _make_frame(glow_color=None):
+def _make_frame(glow_color=None, solid=False):
+    """合成一帧；``solid=True`` 时画实心色块（不该被弧形模式接受）。"""
     frame = np.full((FRAME_HEIGHT, FRAME_WIDTH, 3), BACKGROUND_BGR, dtype=np.uint8)
-    if glow_color is not None:
-        x, y, w, h = GLOW_RECT
-        cv2.rectangle(frame, (x, y), (x + w - 1, y + h - 1), glow_color, thickness=-1)
+    if glow_color is None:
+        return frame
+    if solid:
+        cv2.circle(frame, ARC_CENTER, ARC_RADIUS, glow_color, thickness=-1)
+    else:
+        cv2.ellipse(frame, ARC_CENTER, (ARC_RADIUS, ARC_RADIUS), 0, -60, 60,
+                    glow_color, thickness=5)
     return frame
 
 
 class TaskHarness:
     """把 GlowClickTask 从框架里剥出来：假时钟 + 假截图 + 假点击。"""
 
-    def __init__(self, glow_color=None, **config_overrides):
+    def __init__(self, glow_color=None, solid=False, **config_overrides):
         self.glow_color = glow_color
+        self.solid = solid
         self.now = 0.0
         self.logs: list[str] = []
         self.clicks: list[tuple[int, int]] = []
@@ -65,7 +73,7 @@ class TaskHarness:
 
         task.log_info = lambda message, notify=False: self.logs.append(str(message))
         task.active_time = lambda: self.now
-        task.next_frame = lambda: _make_frame(self.glow_color)
+        task.next_frame = lambda: _make_frame(self.glow_color, self.solid)
         task.click = lambda box, **kwargs: self.clicks.append(box.center())
         task.draw_boxes = lambda *args, **kwargs: None
         task.resolution_scale = lambda: 1.0
@@ -91,16 +99,31 @@ class TaskHarness:
 class TestGlowClickTask(unittest.TestCase):
     # ── 1. 命中即点击 ───────────────────────────────────────
 
-    def test_clicks_once_on_green_glow(self):
+    def test_clicks_once_on_green_arc(self):
+        """点击位置必须是拟合圆心（准心），不是弧的外接框中心。"""
         harness = TaskHarness(GREEN_BGR)
         harness.run()
-        self.assertEqual(harness.clicks, [(962, 542)])
+        self.assertEqual(len(harness.clicks), 1)
+        cx, cy = harness.clicks[0]
+        self.assertAlmostEqual(cx, ARC_CENTER[0], delta=8)
+        self.assertAlmostEqual(cy, ARC_CENTER[1], delta=8)
 
-    def test_clicks_on_yellow_glow(self):
+    def test_clicks_on_yellow_arc(self):
         harness = TaskHarness(YELLOW_BGR)
         harness.run()
         self.assertEqual(len(harness.clicks), 1)
-        self.assertIn("黄色泛光", harness.logs[0])
+        self.assertIn("黄色可射击光圈", harness.logs[0])
+
+    def test_solid_blob_not_clicked_by_default(self):
+        """实心色块不是光环，默认不该点（避免误点中心区域的彩色 UI）。"""
+        harness = TaskHarness(GREEN_BGR, solid=True)
+        harness.run(times=3)
+        self.assertEqual(harness.clicks, [])
+
+    def test_solid_blob_clicked_when_ring_not_required(self):
+        harness = TaskHarness(GREEN_BGR, solid=True, **{"要求环形": False})
+        harness.run()
+        self.assertEqual(len(harness.clicks), 1)
 
     def test_no_click_without_glow(self):
         harness = TaskHarness()
