@@ -3,6 +3,7 @@ from enum import Enum
 
 class FeatureList(str, Enum):
     account_switch = 'account_switch'
+    char_button = 'char_button'
     close_button = 'close_button'
     confirm_button = 'confirm_button'
     confirm_button_2 = 'confirm_button_2'

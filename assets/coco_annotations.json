@@ -5,6 +5,12 @@
       "file_name": "images/1.png",
       "width": 1920,
       "height": 1080
+    },
+    {
+      "id": 2,
+      "file_name": "images/2.png",
+      "width": 1920,
+      "height": 1080
     }
   ],
   "annotations": [
@@ -150,6 +156,19 @@
       ],
       "area": 638,
       "iscrowd": 0
+    },
+    {
+      "id": 12,
+      "image_id": 2,
+      "category_id": 12,
+      "bbox": [
+        1842,
+        32,
+        23,
+        31
+      ],
+      "area": 713,
+      "iscrowd": 0
     }
   ],
   "categories": [
@@ -200,6 +219,11 @@
     {
       "id": 11,
       "name": "star_link_icon",
+      "supercategory": ""
+    },
+    {
+      "id": 12,
+      "name": "char_button",
       "supercategory": ""
     }
   ]

@@ -13,6 +13,7 @@ from src.core.game_window import find_game_hwnd
 from src.core.global_config_store import get_global_config
 from src.data.FeatureList import FeatureList
 from src.data.lang import get_lang_accessor
+from src.image.hsv_config import HSVRange
 from src.interaction.KeyConfig import KeyConfigManager
 from src.interaction.ScreenPosition import ScreenPosition
 
@@ -346,14 +347,23 @@ class BaseGameTask(RuntimeMixin, FrameworkOverrideMixin, BaseTask):
         Returns:
             bool: 当前处于游戏世界返回 True。
         """
-        main_world_features = [FeatureList.login_out]
+        main_world_features = [FeatureList.char_button]
 
-        in_world = all(self.find_one(f, vertical_variance=0.01, horizontal_variance=0.02) for f in main_world_features)
-
-        if in_world:
-            self._logged_in = True
+        in_world = all(self.find_one(f, vertical_variance=0.01, horizontal_variance=0.02, mask_function=self.make_hsv_isolator(HSVRange.WHITE, invert=False)) for f in main_world_features)
 
         return in_world
+
+    def wait_login(self):
+        """
+        处理登录界面的各种弹窗（月卡、签到、奖励等）。
+        """
+        if not self._logged_in and self.find_one(
+            feature=[FeatureList.login_out],
+            vertical_variance=0.01,
+            horizontal_variance=0.02,
+            mask_function=self.make_hsv_isolator(HSVRange.WHITE),
+        ):
+            self.click(0.5, 0.5)
 
     def is_main(self, esc=False):
         """
@@ -372,6 +382,8 @@ class BaseGameTask(RuntimeMixin, FrameworkOverrideMixin, BaseTask):
         if self.in_world():
             self._logged_in = True
             return True
+        # 登录流程处理成功
+        self.wait_login()
 
         if result := (
             self.find_one(feature=[FeatureList.confirm_button, FeatureList.confirm_button_2], vertical_variance=0.01, horizontal_variance=0.02)
