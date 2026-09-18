@@ -322,6 +322,6 @@ jobs:
             ### 更新日志 ${{ needs.sync.outputs.start_tag }} -> ${{ needs.sync.outputs.end_tag }}:
               ${{ needs.sync.outputs.changes_with_asterisk }}
             ### Download
-            * [ok-ap-win32-China-setup-${{ steps.tag.outputs.safe_tag }}.exe](https://github.com/AliceJump/ok-azurpromilia/releases/download/${{ steps.tag.outputs.tag }}/ok-ap-win32-China-setup-${{ steps.tag.outputs.safe_tag }}.exe) China setup
-            * [ok-ap-win32-Global-setup-${{ steps.tag.outputs.safe_tag }}.exe](https://github.com/AliceJump/ok-azurpromilia/releases/download/${{ steps.tag.outputs.tag }}/ok-ap-win32-Global-setup-${{ steps.tag.outputs.safe_tag }}.exe) Global setup
+            * [ok-ap-win32-China-setup-${{ steps.tag.outputs.safe_tag }}.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/ok-ap-win32-China-setup-${{ steps.tag.outputs.safe_tag }}.exe) China setup
+            * [ok-ap-win32-Global-setup-${{ steps.tag.outputs.safe_tag }}.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/ok-ap-win32-Global-setup-${{ steps.tag.outputs.safe_tag }}.exe) Global setup
           files: pyappify_dist/**
