@@ -145,3 +145,9 @@ msgstr "Asistencia de Vínculo Estelar"
 
 msgid "星结辅助触发式任务：缔结星结时，光标指向目标出现可射击光圈，自动点击屏幕准心完成射击。"
 msgstr "Tarea de activación de asistencia de Vínculo Estelar: al forjar un Vínculo Estelar, hace clic automáticamente en la mira para disparar cuando aparece el anillo de disparo sobre el objetivo."
+
+msgid "宝箱开锁"
+msgstr "Desbloqueo de cofres"
+
+msgid "宝箱开锁触发式任务：校准颜色条带后按钥匙位置逐个点击开锁。"
+msgstr "Tarea de activación de desbloqueo de cofres: tras calibrar las bandas de color, hace clic en cada posición de llave para desbloquear."

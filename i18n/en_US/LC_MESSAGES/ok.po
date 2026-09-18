@@ -145,3 +145,9 @@ msgstr "Star Link Assist"
 
 msgid "星结辅助触发式任务：缔结星结时，光标指向目标出现可射击光圈，自动点击屏幕准心完成射击。"
 msgstr "Star Link assist trigger task: while bonding a Star Link, automatically clicks the screen crosshair to fire when the shootable ring appears over the target."
+
+msgid "宝箱开锁"
+msgstr "Treasure Unlock"
+
+msgid "宝箱开锁触发式任务：校准颜色条带后按钥匙位置逐个点击开锁。"
+msgstr "Treasure unlock trigger task: after calibrating the color bands, clicks each key position in turn to unlock."
