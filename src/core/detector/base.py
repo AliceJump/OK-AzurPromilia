@@ -121,4 +121,6 @@ class InvertedDetector:
             return None
         if self._box is None:
             return None
-        return Hit(box=self._box, source=f"not_{getattr(self._detector, 'source', '')}".strip("_"))
+        # source 只用于日志辨识；取反后的语义是「原判据不成立」，
+        # 因此带上原判据名而不是识别源（detector 上没有 source 属性）。
+        return Hit(box=self._box, source=self._name)

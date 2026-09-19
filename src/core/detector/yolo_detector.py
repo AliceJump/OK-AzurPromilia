@@ -29,8 +29,7 @@ class YoloDetector:
         conf: 置信度阈值。
         model_key: 指定模型键；None 时由框架按首个 name 解析。
         pick: 多候选选择策略，见本模块 ``PICK_*`` 常量。
-        name_suffix: 判据名称后缀，用于日志区分同类判据。
-        task_name: 判据名称；缺省由 name 推导。
+        task_name: 判据名称；缺省由 name 推导（多个 name 时用 ``_`` 连接）。
 
     Example:
         >>> YoloDetector("target", box=roi, conf=0.7)               # 置信度最高

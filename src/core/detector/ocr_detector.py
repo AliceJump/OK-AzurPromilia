@@ -43,7 +43,7 @@ class OcrDetector:
 
     Example:
         >>> OcrDetector("确认", box=confirm_area, threshold=0.8)
-        >>> OcrDetector(re.compile(r"第\\d+页"), box=page_area, pick=PICK_LAST)
+        >>> OcrDetector(re.compile(r"第\\d+页"), box=page_area, pick=PICK_TOPMOST)
     """
 
     def __init__(

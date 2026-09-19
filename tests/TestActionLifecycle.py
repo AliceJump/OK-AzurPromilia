@@ -285,6 +285,19 @@ class TestOcrDetector(unittest.TestCase):
 
         self.assertEqual(OcrDetector(re.compile(r"第\d+页")).name, r"第\d+页")
 
+    def test_invalid_pick_rejected(self):
+        """非法 pick 应在构造时立刻报错，而不是等到运行时静默取错候选。"""
+        with self.assertRaises(ValueError):
+            OcrDetector("x", pick="last")   # 曾有 docstring 误写 PICK_LAST，实际不存在
+
+    def test_topmost_pick(self):
+        from src.core.detector.ocr_detector import PICK_TOPMOST
+
+        self.task.ocr_result = [box(1, 90), box(9, 20)]
+        detector = OcrDetector("x", pick=PICK_TOPMOST)
+        self.task._resolve_detector(detector)
+        self.assertEqual(detector.detect(object()).box.y, 20)
+
 
 class TestButtonDetectorAdapter(unittest.TestCase):
     def setUp(self):
@@ -356,6 +369,18 @@ class TestCombinators(unittest.TestCase):
         self.task._resolve_detector(inverted)
         self.assertIsNone(inverted.detect("present"))
         self.assertIsNotNone(inverted.detect("absent"))
+
+    def test_inverted_hit_source_reflects_inner_name(self):
+        """取反命中的 source 应带原判据名，而不是裸的前缀。
+
+        detector 上没有 ``source`` 属性（那是 Hit 的字段），早期实现
+        ``getattr(self._detector, 'source', '')`` 恒为空 → source 永远是 'not'。
+        """
+        inner = PredicateDetector(lambda f: None, name="band_gone")
+        inverted = InvertedDetector(inner, box=box(2, 2))
+        hit = inverted.detect(object())
+        self.assertIsNotNone(hit)
+        self.assertEqual(hit.source, "not_band_gone")
 
     def test_inverted_without_box_never_hits(self):
         """取反判据无法推出点击目标，未给 box 时不应命中。"""
