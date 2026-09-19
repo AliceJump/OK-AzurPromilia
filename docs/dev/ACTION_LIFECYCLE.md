@@ -1,32 +1,43 @@
 # Action 生命周期（完整参考）
 
-> 本文是 `wait_action_result` / `wait_expectation` 与识别层 `src/core/detector/` 的**完整使用参考**，
-> 也是这一主题的**唯一文档**——设计推演、命名取舍、改造前审计的结论都已收进本文（见 §10.1 / §10.2），
-> 不再单独维护过程稿。
+> 本文是 `wait_action_result` / `wait_expectation` 与识别层 `src/core/detector/` 的**完整使用参考**。
 > `DEVELOPMENT.md` 中的「Action 生命周期」一节是本文摘要，细节以本文为准。
 
 ## 目录
 
-- [1. 它解决什么问题](#1)
-- [2. 分层模型](#2)
-- [3. 快速上手](#3)
-- [4. 识别层：统一判据](#4)
-  - [4.1 `Hit`：统一命中表示](#41-hit)
-  - [4.2 五个适配器（含全部参数）](#42)
-  - [4.3 三个组合器](#43)
-  - [4.4 判据的 `attach` 与宿主绑定](#44-attach)
-- [5. 编排层：`wait_action_result`](#5-wait_action_result)
-  - [5.1 三阶段流程](#51)
-  - [5.2 完整参数表](#52)
-  - [5.3 动作回调签名](#53)
+- [1. 它解决什么问题](#1-它解决什么问题)
+- [2. 分层模型](#2-分层模型)
+- [3. 快速上手](#3-快速上手)
+- [4. 识别层：统一判据](#4-识别层统一判据)
+  - [4.1 `Hit`：统一命中表示](#41-hit统一命中表示)
+  - [4.2 五个适配器（含全部参数）](#42-五个适配器含全部参数)
+  - [4.3 三个组合器](#43-三个组合器)
+  - [4.4 判据的 `attach` 与宿主绑定](#44-判据的-attach-与宿主绑定)
+- [5. 编排层：`wait_action_result`](#5-编排层wait_action_result)
+  - [5.1 三阶段流程](#51-三阶段流程)
+  - [5.2 完整参数表](#52-完整参数表)
+  - [5.3 动作回调签名](#53-动作回调签名)
 - [6. `wait_expectation`](#6-wait_expectation)
-- [7. 典型用法配方](#7)
-- [8. 契约与陷阱](#8)
-- [9. 什么时候不该用它](#9)
-- [10. 从旧 API 迁移](#10-api)
-  - [10.1 改造前的调用方实测（决策依据）](#101)
-  - [10.2 改造前的实现全景（历史快照）](#102)
-- [11. 真实落地样例](#11)
+- [7. 典型用法配方](#7-典型用法配方)
+  - [7.1 等到就点（最简）](#71-等到就点最简)
+  - [7.2 点完等结果出现（A ≠ C）](#72-点完等结果出现a--c)
+  - [7.3 点完等元素消失](#73-点完等元素消失)
+  - [7.4 用 OCR 文本](#74-用-ocr-文本)
+  - [7.5 B 成立期间重复操作](#75-b-成立期间重复操作)
+  - [7.6 多区域 / 多识别源回退](#76-多区域--多识别源回退)
+  - [7.7 条件与预期用不同识别源](#77-条件与预期用不同识别源)
+- [8. 契约与陷阱](#8-契约与陷阱)
+  - [`expect=None` 表示「动作成功即返回」](#expectnone-表示动作成功即返回)
+  - [`settle_time` 的语义是「每次判定都要连续成立」](#settle_time-的语义是每次判定都要连续成立)
+  - [计时用 `active_time()`](#计时用-active_time)
+  - [条件命中与动作之间会重取一帧](#条件命中与动作之间会重取一帧)
+  - [`draw=True` 的调试框](#drawtrue-的调试框)
+  - [返回 `False` 的含义](#返回-false-的含义)
+  - [判据必须接受外部 `frame`](#判据必须接受外部-frame)
+- [9. 什么时候不该用它](#9-什么时候不该用它)
+- [10. 真实落地样例](#10-真实落地样例)
+  - [`TreasureUnlockTask._click_band`（`src/tasks/trigger/TreasureUnlockTask.py`）](#treasureunlocktask_click_bandsrctaskstriggertreasureunlocktaskpy)
+- [相关文档](#相关文档)
 
 ---
 
@@ -43,13 +54,7 @@
 | **B** | 持续条件 | 可选。B 持续命中时重复附加动作；未命中立即停止 |
 | **Extra** | 附加动作 | 可选。持续阶段重复执行的动作，每次之后继续查 C |
 
-这套逻辑以前散落在各任务里各写各的，且旧 `click_feature` 有三个无法回避的缺陷：
-
-1. **A 与 C 共用同一个 `feature` 参数** → 只能表达「元素出现 → 点 → 该元素消失」，表达不了 A ≠ C；
-2. **只支持模板匹配** → 要等 YOLO / OCR 结果就得另起一套；
-3. **没有 B 与附加动作** → 需要「一边成立一边反复操作」时只能手写循环。
-
-现在由两个 API 覆盖：`wait_action_result`（完整生命周期）与 `wait_expectation`（只等结果）。
+这套逻辑由两个 API 覆盖：`wait_action_result`（完整生命周期）与 `wait_expectation`（只等结果）。
 
 ---
 
@@ -312,7 +317,7 @@ PredicateDetector(
 | `InvertedDetector` | `(detector, box=None, name=None)` | 取反：原判据**未**命中即为命中 |
 | `BlindPointDetector` | `(x, y, name="blind_point")` | 恒命中，返回指定坐标 |
 
-**`MultiBoxDetector` 可混用不同识别源**——这是它取代旧 `boxes` 参数的关键：
+**`MultiBoxDetector` 可混用不同识别源**，按列表顺序回退，第一个命中即返回：
 
 ```python
 MultiBoxDetector([
@@ -531,7 +536,7 @@ self.wait_action_result(
 )
 ```
 
-### 7.5 B 成立期间重复操作（旧 API 表达不了）
+### 7.5 B 成立期间重复操作
 
 ```python
 progress = TemplateDetector(FeatureList.progress_bar, box=bar_box)
@@ -636,81 +641,8 @@ target = fresh if fresh is not None else hit
 
 ---
 
-## 10. 从旧 API 迁移
 
-旧 `click_feature` / `wait_feature_disappear` / `feature_stable` / `click_confirm`
-**已删除**（均为零调用方的死代码）。对应新写法：
-
-| 旧 | 新 |
-|---|---|
-| `click_feature(feature, box, ...)` | `wait_action_result(condition=TemplateDetector(feature, box=box), action=..., expect=InvertedDetector(...))` |
-| `wait_feature_disappear(feature, box, t)` | `wait_expectation(InvertedDetector(TemplateDetector(feature, box=box), box=box), time_out=t)` |
-| `feature_stable(feature, box, d)` | `wait_expectation(TemplateDetector(feature, box=box), time_out=d, settle_time=d)` |
-| `click_confirm(...)` | 自建判据；`find_confirm()` 仍可用 |
-| `boxes=[None, b1, b2]` 多区域 | `MultiBoxDetector([...])` |
-| `blind_point` 参数 | `MultiBoxDetector([..., BlindPointDetector(x, y)])` |
-
-⚠️ **`wait_click_feature` / `wait_click_ocr` 仍保留且在用**（`AccountMixin.login_flow`、
-`TestInteractionTask`），暂不转调——收益小于回归风险。它们是「等到就点」的便捷封装，
-没有 C 验证需求时继续用它们即可。
-
-### 10.1 改造前的调用方实测（决策依据）
-
-命名与逻辑的取舍取决于「谁在用」。改造前对每个候选函数做过调用方实测：
-
-| 函数 | 改造前位置 | 调用方 | 处置 |
-|---|---|---|---|
-| `click_feature` | `runtime_mixin.py:198-257` | **无** | ☠️ 删除（能力由新函数承接） |
-| `wait_feature_disappear` | `runtime_mixin.py:259-277` | 仅 `click_feature` 内部 | ☠️ 删除（其语义并入 C 判定） |
-| `feature_stable` | `runtime_mixin.py:186-196` | 仅 `click_feature` 内部 | ☠️ 删除（改用 `wait_until(settle_time=)`） |
-| `click_confirm` | `BaseGameTask.py:453-502` | **无** | ☠️ 删除；**保留 `find_confirm`**（`SkipDialogTask:42` 在用） |
-| `safe_back` | `runtime_mixin.py:390-437` | **无** | ⚠️ **保留**（是有效范式） |
-| `wait_button` | `runtime_mixin.py:689-727` | **无** | ⚠️ **保留**（文档已公开，删了与文档冲突） |
-| `wait_click_feature` | `runtime_mixin.py:1138-1187` | `login_flow`、`TestInteractionTask` | ✅ 保留，暂不转调 |
-| `wait_click_ocr` | `runtime_mixin.py:1189-1300` | `TestInteractionTask` | ✅ 保留，暂不转调 |
-
-**关键推论**：这是一次**「先删、再建、最后收口」**的改造，不是「给 `click_feature` 改个名」。
-因为它是死代码，最干净的做法是**删除**，让新函数承接能力——而不是把它的名字留下来继续误导人。
-
-> 🪤 **排查教训：`grep click_feature` 会命中 `wait_click_feature` 的子串。**
-> 第一轮排查时按 `click_feature` 搜索，把 `wait_click_feature` / `wait_click_ocr` 的调用方
-> 误判成了 `click_feature` 的调用方，导致「`click_feature` 有调用方」的错误结论。
-> 核实调用方时要用**词边界**（`grep -n "\bclick_feature\b"`）或直接按符号精确定位，
-> 不要依赖裸子串匹配。
-
-### 10.2 改造前的实现全景（历史快照）
-
-改造前仓库里存在 8 处形态相近的「识别 → 动作 → 验证」实现，能力覆盖如下
-（**A** 前置条件 / **Action** 主动作 / **B** 持续条件 / **Extra Action** B 期间重复动作 / **C** 结果验证）：
-
-| 实现 | 位置 | A | Action | B | Extra Action | C |
-|---|---|:---:|:---:|:---:|:---:|:---:|
-| `RuntimeMixin.click_feature()` | `runtime_mixin.py:198-257` | ✅ | ✅ | — | — | ⚠️ 消失语义 |
-| `TreasureUnlockTask` | `TreasureUnlockTask.py:157-246` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `BaseGameTask.click_confirm()` | `BaseGameTask.py:453-502` | ⚠️ 弱 | ✅ | — | — | ⚠️ 消失语义 |
-| `RuntimeMixin.wait_click_feature()` | `runtime_mixin.py:1138-1187` | ✅ | ✅ | — | — | — |
-| `RuntimeMixin.wait_click_ocr()` | `runtime_mixin.py:1189-1300` | ✅ | ✅ | — | — | — |
-| `RuntimeMixin.safe_back()` | `runtime_mixin.py:390-437` | ⚠️ 反向 | ✅ 恢复 | — | — | — |
-| `StarLinkAssistTask.run()` | `StarLinkAssistTask.py:108-147` | ✅ | ✅ | — | — | — |
-| `SkipDialogTask.run()` | `SkipDialogTask.py` | ✅ | ✅ | — | — | — |
-
-图例：✅ 已覆盖 ｜ ⚠️ 语义与目标不同 ｜ — 完全缺失
-
-两个关键观测：
-
-1. **`click_feature()` 是当时最接近完整生命周期的实现**（缺 B），但它是死代码；
-   而 **A 与 C 共用同一个 `feature` 参数**——它只能表达「某元素出现 → 点击 → 该元素消失」，
-   无法表达「看到 A 元素 → 点击 → 期待 C 元素出现」这种 **A ≠ C** 的场景。
-   这正是新 API 把 `condition` / `expect` 拆成两个独立判据的直接原因。
-2. **`TreasureUnlockTask` 是唯一五环节齐全的实现**，但它是**任务级状态机**
-   （`WAIT_TREASURE` / `CALIBRATING_BANDS` / `UNLOCKING` / `COMPLETION_CHECK` / `FINISHED`），
-   深度耦合宝箱业务：`_calibrated_bands` 布局缓存、`_detector()` 检测器工厂、
-   11 个 `_` 前缀隐藏配置键。它的价值是**被抽取成通用 API 的样本**，
-   而不是可复用的组件——所以 §11 只把它的 `_click_band`（C 那一小段）作为落地样例。
-
----
-
-## 11. 真实落地样例
+## 10. 真实落地样例
 
 ### `TreasureUnlockTask._click_band`（`src/tasks/trigger/TreasureUnlockTask.py`）
 

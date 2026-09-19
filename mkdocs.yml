@@ -13,6 +13,10 @@ validation:
 
 strict: true
 
+# 让标题锚点与 GitHub / IDE 保持一致，见 tools/mkdocs_github_slugify.py
+hooks:
+  - tools/mkdocs_github_slugify.py
+
 theme:
   name: material
   icon:

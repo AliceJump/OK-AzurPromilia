@@ -212,7 +212,7 @@ hit = self.wait_expectation(TemplateDetector(FeatureList.main_ui), time_out=2.0)
 - **条件命中与动作之间会重取一帧**，防止会动的目标在 `settle_time` 期间位移。
 
 > 📖 **完整参考见 [`ACTION_LIFECYCLE.md`](ACTION_LIFECYCLE.md)** —— 含全部识别器参数（`pick` 策略、
-> `mask_function`、`use_find_one` 等）、组合器语义、典型配方、迁移对照表与真实落地样例。
+> `mask_function`、`use_find_one` 等）、组合器语义、典型用法配方与真实落地样例。
 
 ## 辅助星结：可射击光圈检测与辅助任务
 
