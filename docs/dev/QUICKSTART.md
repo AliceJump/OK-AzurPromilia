@@ -23,6 +23,9 @@ uv run python main_debug.py
 1. 在 `src/tasks/onetime/` 下新建文件，继承 `BaseGameTask`（最简范例见 `src/tasks/onetime/TestScreenshotTask.py`）。
 2. 在 `__init__` 中设置 `name`、`description`、`icon` 与 `default_config`。
 3. 实现 `run(self)`，使用 `self.wait_ocr` / `self.wait_click_feature` / `self.click_relative` 等 API。
+   若是「看到某东西 → 点它 → 验证结果」这类流程，用 `self.wait_action_result`（识别源适配器见
+   `src/core/detector/`）；只等一个结果用 `self.wait_expectation`。详见 `DEVELOPMENT.md` 的
+   「Action 生命周期」一节。
 4. 在 `src/config.py` 的 `onetime_tasks` 中注册：`["src.tasks.onetime.MyTask", "MyTask"]`。
 
 ## 4. 新增一个触发式任务
