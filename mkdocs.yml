@@ -13,6 +13,10 @@ validation:
 
 strict: true
 
+# 让标题锚点与 GitHub / IDE 保持一致，见 tools/mkdocs_github_slugify.py
+hooks:
+  - tools/mkdocs_github_slugify.py
+
 theme:
   name: material
   icon:
@@ -75,3 +79,4 @@ nav:
   - 开发:
     - 从源码运行: dev/QUICKSTART.md
     - 开发指南: dev/DEVELOPMENT.md
+    - Action 生命周期: dev/ACTION_LIFECYCLE.md

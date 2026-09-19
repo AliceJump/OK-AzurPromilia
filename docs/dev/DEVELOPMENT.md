@@ -15,6 +15,7 @@
 | `src/core/BaseGameTask.py` | **任务基类**：暂停感知计时、配置迁移、异常处理、配置分组 |
 | `src/core/base_mixin/runtime_mixin.py` | 通用能力库：分辨率映射、点击验证、YOLO 检测、画面稳定判定、键鼠 |
 | `src/core/base_mixin/framework_override_mixin.py` | 用"同名覆写 + `super()`"扩展框架方法（不复制框架代码） |
+| `src/core/detector/` | **识别层**：把四类识别源（模板 / YOLO / OCR / 按钮）归一成统一判据 `Hit` / `Detector`，供 Action 生命周期编排使用 |
 | `src/core/config_migration.py` | 配置键迁移工具（改键名时使用，防丢用户配置） |
 | `src/core/global_config_store.py` | 本项目自建的全局配置（**不走框架的 `config['global_configs']`**） |
 | `src/interaction/` | 窗口与键鼠：`GameInteraction`（自定义后台输入）、`Mouse`、`ScreenPosition`、`KeyConfig` |
@@ -164,6 +165,54 @@ self.find_button(box, thresholds=SKIP_BUTTON)
   只用文字特征误报 17，加上底色区间后 0，命中率不变，单次 +0.07 ms。按需开启。
 - 所有阈值集中在 `ButtonThresholds`，用 `with_(...)` 生成改过的副本，不修改默认值。
 - 传入的 Box 要**贴合按钮**；Box 远大于按钮时文本带相对过薄，会被形状判定拒绝。
+
+**以视觉状态等待**用 `wait_button(box, time_out=5, ...)`，不要用固定延时。若还需要「等到 → 点击 → 验证结果」的完整流程，见下一节的 `wait_action_result`。
+
+## Action 生命周期：等条件 → 动作 → 验证
+
+游戏里大量操作是同一个形状：**看到某个东西 → 动它 → 确认预期结果出现了**。
+这类「识别 + 动作 + 再识别」的流程收敛成两个 API：
+
+- **识别层** `src/core/detector/` —— 把模板 / YOLO / OCR / 按钮四类识别源归一成统一判据
+  `Detector.detect(frame) -> Hit | None`；
+- **编排层** `RuntimeMixin.wait_action_result` / `wait_expectation` —— 负责「何时执行动作、何时判定成功」。
+
+两层正交：识别层只管「这一帧有没有」，编排层只管「什么时候做、做几次」。
+
+```python
+from src.core.detector import TemplateDetector
+from src.data.FeatureList import FeatureList
+
+# A≠C：看到宝箱图标 → 点击 → 等解锁界面出现
+self.wait_action_result(
+    condition=TemplateDetector(FeatureList.treasure_icon),   # A 前置条件
+    action=lambda hit: self.click(hit.box),                  # 主 Action
+    expect=TemplateDetector(FeatureList.unlock_ui),          # C 预期结果
+    time_out=5, expect_time_out=1.5, max_attempts=2,
+)
+```
+
+| 阶段 | 触发条件 | 行为 |
+|------|------|------|
+| ① 等条件 | 总是执行 | `condition` 在 `time_out` 内命中才继续；未命中 → 返回 `False`（`raise_if_not_found=True` 则抛 `WaitFailedException`） |
+| ② 动作 + 验证 | 条件命中后 | `action(hit)` → `expect` 验证；未通过则重试，最多 `max_attempts` 次 |
+| ③ 持续阶段 | 仅当给了 `while_condition` **且** `repeat_action` | `while_condition` 持续命中就重复 `repeat_action`；**未命中立即停止**；每轮后继续检查 `expect`，命中即返回 `True` |
+
+只等一个结果（只用到 C）则走 `wait_expectation`：
+
+```python
+hit = self.wait_expectation(TemplateDetector(FeatureList.main_ui), time_out=2.0)
+```
+
+三条最容易踩的契约：
+
+- **`expect=None` 表示「动作成功即返回」** —— 调用方声明该动作没有可验证的结果。
+- **`settle_time` 默认 0（命中一次即可）**；非 0 的语义是「**每次判定**都要求连续成立够时长」，
+  而不是「总共等这么久」—— 会显著增加耗时，只在「等 UI 稳定下来再确认」时开启。
+- **条件命中与动作之间会重取一帧**，防止会动的目标在 `settle_time` 期间位移。
+
+> 📖 **完整参考见 [`ACTION_LIFECYCLE.md`](ACTION_LIFECYCLE.md)** —— 含全部识别器参数（`pick` 策略、
+> `mask_function`、`use_find_one` 等）、组合器语义、典型用法配方与真实落地样例。
 
 ## 辅助星结：可射击光圈检测与辅助任务
 
