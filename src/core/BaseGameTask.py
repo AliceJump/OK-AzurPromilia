@@ -5,10 +5,11 @@ from datetime import datetime
 import ok.gui.debug.Screenshot as _ok_screenshot
 from ok import BaseTask, TaskDisabledException, TriggerTask, WaitFailedException
 
+from src.config import config as app_config
 from src.core.base_mixin.framework_override_mixin import FrameworkOverrideMixin
 from src.core.base_mixin.runtime_mixin import RuntimeMixin
+from src.core.base_mixin.ui_mixin import UIMixin
 from src.core.config_migration import migrate_config_file_keys, migrate_config_values
-from src.config import config as app_config
 from src.core.game_window import find_game_hwnd
 from src.core.global_config_store import get_global_config
 from src.data.FeatureList import FeatureList
@@ -27,7 +28,7 @@ def _round_ratio(value):
         return value
 
 
-class BaseGameTask(RuntimeMixin, FrameworkOverrideMixin, BaseTask):
+class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
     """游戏自动化任务基类，提供通用的交互和识别功能。
 
     新项目从本类派生一次性任务；触发式任务继承
