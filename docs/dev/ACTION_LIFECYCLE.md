@@ -1,8 +1,9 @@
 # Action 生命周期（完整参考）
 
-> 本文是 `wait_action_result` / `wait_expectation` 与识别层 `src/core/detector/` 的**完整使用参考**。
-> 设计推演过程见 `ACTION_LIFECYCLE_DESIGN.md`，命名取舍见 `ACTION_LIFECYCLE_RENAME.md`。
-> `DEVELOPMENT.md` 中的「Action 生命周期」一节是本节摘要，细节以本文为准。
+> 本文是 `wait_action_result` / `wait_expectation` 与识别层 `src/core/detector/` 的**完整使用参考**，
+> 也是这一主题的**唯一文档**——设计推演、命名取舍、改造前审计的结论都已收进本文（见 §10.1 / §10.2），
+> 不再单独维护过程稿。
+> `DEVELOPMENT.md` 中的「Action 生命周期」一节是本文摘要，细节以本文为准。
 
 ## 目录
 
@@ -23,6 +24,8 @@
 - [8. 契约与陷阱](#8)
 - [9. 什么时候不该用它](#9)
 - [10. 从旧 API 迁移](#10-api)
+  - [10.1 改造前的调用方实测（决策依据）](#101)
+  - [10.2 改造前的实现全景（历史快照）](#102)
 - [11. 真实落地样例](#11)
 
 ---
@@ -651,6 +654,60 @@ target = fresh if fresh is not None else hit
 `TestInteractionTask`），暂不转调——收益小于回归风险。它们是「等到就点」的便捷封装，
 没有 C 验证需求时继续用它们即可。
 
+### 10.1 改造前的调用方实测（决策依据）
+
+命名与逻辑的取舍取决于「谁在用」。改造前对每个候选函数做过调用方实测：
+
+| 函数 | 改造前位置 | 调用方 | 处置 |
+|---|---|---|---|
+| `click_feature` | `runtime_mixin.py:198-257` | **无** | ☠️ 删除（能力由新函数承接） |
+| `wait_feature_disappear` | `runtime_mixin.py:259-277` | 仅 `click_feature` 内部 | ☠️ 删除（其语义并入 C 判定） |
+| `feature_stable` | `runtime_mixin.py:186-196` | 仅 `click_feature` 内部 | ☠️ 删除（改用 `wait_until(settle_time=)`） |
+| `click_confirm` | `BaseGameTask.py:453-502` | **无** | ☠️ 删除；**保留 `find_confirm`**（`SkipDialogTask:42` 在用） |
+| `safe_back` | `runtime_mixin.py:390-437` | **无** | ⚠️ **保留**（是有效范式） |
+| `wait_button` | `runtime_mixin.py:689-727` | **无** | ⚠️ **保留**（文档已公开，删了与文档冲突） |
+| `wait_click_feature` | `runtime_mixin.py:1138-1187` | `login_flow`、`TestInteractionTask` | ✅ 保留，暂不转调 |
+| `wait_click_ocr` | `runtime_mixin.py:1189-1300` | `TestInteractionTask` | ✅ 保留，暂不转调 |
+
+**关键推论**：这是一次**「先删、再建、最后收口」**的改造，不是「给 `click_feature` 改个名」。
+因为它是死代码，最干净的做法是**删除**，让新函数承接能力——而不是把它的名字留下来继续误导人。
+
+> 🪤 **排查教训：`grep click_feature` 会命中 `wait_click_feature` 的子串。**
+> 第一轮排查时按 `click_feature` 搜索，把 `wait_click_feature` / `wait_click_ocr` 的调用方
+> 误判成了 `click_feature` 的调用方，导致「`click_feature` 有调用方」的错误结论。
+> 核实调用方时要用**词边界**（`grep -n "\bclick_feature\b"`）或直接按符号精确定位，
+> 不要依赖裸子串匹配。
+
+### 10.2 改造前的实现全景（历史快照）
+
+改造前仓库里存在 8 处形态相近的「识别 → 动作 → 验证」实现，能力覆盖如下
+（**A** 前置条件 / **Action** 主动作 / **B** 持续条件 / **Extra Action** B 期间重复动作 / **C** 结果验证）：
+
+| 实现 | 位置 | A | Action | B | Extra Action | C |
+|---|---|:---:|:---:|:---:|:---:|:---:|
+| `RuntimeMixin.click_feature()` | `runtime_mixin.py:198-257` | ✅ | ✅ | — | — | ⚠️ 消失语义 |
+| `TreasureUnlockTask` | `TreasureUnlockTask.py:157-246` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `BaseGameTask.click_confirm()` | `BaseGameTask.py:453-502` | ⚠️ 弱 | ✅ | — | — | ⚠️ 消失语义 |
+| `RuntimeMixin.wait_click_feature()` | `runtime_mixin.py:1138-1187` | ✅ | ✅ | — | — | — |
+| `RuntimeMixin.wait_click_ocr()` | `runtime_mixin.py:1189-1300` | ✅ | ✅ | — | — | — |
+| `RuntimeMixin.safe_back()` | `runtime_mixin.py:390-437` | ⚠️ 反向 | ✅ 恢复 | — | — | — |
+| `StarLinkAssistTask.run()` | `StarLinkAssistTask.py:108-147` | ✅ | ✅ | — | — | — |
+| `SkipDialogTask.run()` | `SkipDialogTask.py` | ✅ | ✅ | — | — | — |
+
+图例：✅ 已覆盖 ｜ ⚠️ 语义与目标不同 ｜ — 完全缺失
+
+两个关键观测：
+
+1. **`click_feature()` 是当时最接近完整生命周期的实现**（缺 B），但它是死代码；
+   而 **A 与 C 共用同一个 `feature` 参数**——它只能表达「某元素出现 → 点击 → 该元素消失」，
+   无法表达「看到 A 元素 → 点击 → 期待 C 元素出现」这种 **A ≠ C** 的场景。
+   这正是新 API 把 `condition` / `expect` 拆成两个独立判据的直接原因。
+2. **`TreasureUnlockTask` 是唯一五环节齐全的实现**，但它是**任务级状态机**
+   （`WAIT_TREASURE` / `CALIBRATING_BANDS` / `UNLOCKING` / `COMPLETION_CHECK` / `FINISHED`），
+   深度耦合宝箱业务：`_calibrated_bands` 布局缓存、`_detector()` 检测器工厂、
+   11 个 `_` 前缀隐藏配置键。它的价值是**被抽取成通用 API 的样本**，
+   而不是可复用的组件——所以 §11 只把它的 `_click_band`（C 那一小段）作为落地样例。
+
 ---
 
 ## 11. 真实落地样例
@@ -693,7 +750,5 @@ def _click_band(self, band: Box):
 | 文档 | 内容 |
 |---|---|
 | `DEVELOPMENT.md` | 目录职责、各检测器实现细节、i18n、配置迁移 |
-| `ACTION_LIFECYCLE_AUDIT.md` | 改造前的现状审计（历史快照） |
-| `ACTION_LIFECYCLE_DESIGN.md` | 分层设计的推演过程，含被否掉的方案 |
-| `ACTION_LIFECYCLE_RENAME.md` | 命名取舍与逐项删/留决策 |
+| `QUICKSTART.md` | 从源码运行、开发环境搭建 |
 | `tests/TestActionLifecycle.py` | 58 例行为固化，改 API 时会被它挡住 |

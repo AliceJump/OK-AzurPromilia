@@ -76,6 +76,3 @@ nav:
     - 从源码运行: dev/QUICKSTART.md
     - 开发指南: dev/DEVELOPMENT.md
     - Action 生命周期: dev/ACTION_LIFECYCLE.md
-    - 生命周期设计: dev/ACTION_LIFECYCLE_DESIGN.md
-    - 生命周期命名: dev/ACTION_LIFECYCLE_RENAME.md
-    - 生命周期审计: dev/ACTION_LIFECYCLE_AUDIT.md
