@@ -9,7 +9,7 @@ from enum import Enum
 
 import cv2
 import numpy as np
-from ok import Box
+from ok import Box, WaitFailedException
 
 from src.config import config as app_config
 from src.core.global_config_store import KEY_CONFIG_NAME, get_global_config
@@ -182,99 +182,6 @@ class RuntimeMixin:
     # ── 分辨率 ─────────────────────────────────────────
 
     _resolution_warned = False
-
-    def feature_stable(self, feature, box, duration):
-        if duration <= 0:
-            return True
-
-        end_time = time.time() + duration
-        while time.time() < end_time:
-            if not self.find_feature(feature_name=feature, box=box, frame=self.next_frame()):
-                return False
-            self.sleep(0.05)
-
-        return True
-
-    def click_feature(
-        self,
-        feature,
-        boxes=None,
-        time_out=5,
-        after_sleep=0,
-        click_after_delay=0,
-        settle_time=0,
-        blind_point=None,
-        blind_delay=1,
-        verify_disappear=True,
-        verify_timeout=0.5,
-        max_click_retry=3,
-    ):
-        boxes = [None] + (boxes or [])
-
-        start_time = time.time()
-        last_blind_time = 0
-
-        while time.time() - start_time < time_out:
-            frame = self.next_frame()
-
-            for box in boxes:
-                result = self.find_feature(
-                    feature_name=feature,
-                    box=box,
-                    frame=frame,
-                )
-
-                if result and self.feature_stable(feature, box, settle_time):
-                    retry_count = 0
-
-                    while retry_count < max_click_retry:
-                        self.sleep(click_after_delay)
-
-                        self.click(result, after_sleep=after_sleep)
-
-                        if not verify_disappear:
-                            return True
-
-                        if self.wait_feature_disappear(
-                            feature,
-                            box,
-                            verify_timeout,
-                        ):
-                            return True
-
-                        self.log_warning(f"{feature} 点击后未消失，重试 {retry_count + 1}/{max_click_retry}")
-
-                        retry_count += 1
-
-            if blind_point and (time.time() - last_blind_time >= blind_delay):
-                self.click(
-                    blind_point[0],
-                    blind_point[1],
-                    after_sleep=after_sleep,
-                )
-                last_blind_time = time.time()
-
-        return False
-
-    def wait_feature_disappear(
-        self,
-        feature,
-        box=None,
-        timeout=1,
-    ):
-        start = time.time()
-
-        while time.time() - start < timeout:
-            frame = self.next_frame()
-
-            if not self.find_feature(
-                feature_name=feature,
-                box=box,
-                frame=frame,
-            ):
-                return True
-
-        return False
 
     def _wait_for_stable_resolution(self):
         """等待捕获帧尺寸稳定，避免启动阶段的中间帧触发误报。"""
@@ -1132,6 +1039,243 @@ class RuntimeMixin:
             key=key,
         )
         self.send_key_up("alt")
+
+    # ── Action 生命周期 ─────────────────────────────────
+
+    def _resolve_detector(self, detector):
+        """把判据绑定到宿主任务（识别需要调用任务上的 find_feature / ocr 等方法）。
+
+        适配器在没有宿主时无法工作，因此统一在编排入口处绑定一次：
+        这样调用方可以自由构造适配器，不必手动 ``attach``。
+        已经是判据（自带 detect）的对象原样返回。
+
+        Args:
+            detector: 识别层适配器，或已绑定宿主 / 自带 detect 的判据。
+
+        Returns:
+            Detector: 可直接调用 detect(frame) 的判据。
+        """
+        if detector is None:
+            return None
+
+        attach = getattr(detector, "attach", None)
+        if callable(attach) and getattr(detector, "_task", None) is None:
+            attach(self)
+
+        # 组合器：递归绑定内部判据
+        inner = getattr(detector, "detectors", None)
+        if inner:
+            for item in inner:
+                self._resolve_detector(item)
+
+        if not hasattr(detector, "detect"):
+            raise TypeError(
+                f"判据 {detector!r} 缺少 detect(frame) 方法；"
+                "请使用 src.core.detector 下的适配器，或自定义带 detect 的对象"
+            )
+        return detector
+
+    def wait_expectation(
+        self,
+        expectation,
+        time_out: float = 1.0,
+        settle_time: float = 0.0,
+        raise_if_not_found: bool = False,
+    ):
+        """等待一个预期结果成立。
+
+        这是 Action 生命周期的 C（结果验证）收口点：所有「动作之后等某个结果」
+        都应走它，以保持 settle 语义一致。
+
+        Args:
+            expectation: 判据（``src.core.detector`` 下的适配器）。
+            time_out: 最长等待时间。
+            settle_time: 预期需「**持续成立**」的秒数；0（默认）= 命中一次即可。
+                ⚠️ 非 0 时**每次判定**都要求连续成立够时长（不是总共等这么久），
+                会显著增加耗时，只在「等 UI 稳定下来再确认」时开启。
+            raise_if_not_found: 超时未命中时是否抛 ``WaitFailedException``。
+
+        Returns:
+            Hit | None: 命中返回 Hit；超时返回 None。
+
+        Example:
+            >>> self.wait_expectation(
+            ...     TemplateDetector(FeatureList.main_ui),
+            ...     time_out=2.0,
+            ... )
+        """
+        expectation = self._resolve_detector(expectation)
+        result = self.wait_until(
+            lambda: expectation.detect(self.next_frame()),
+            time_out=time_out,
+            settle_time=settle_time,
+            raise_if_not_found=raise_if_not_found,
+        )
+        return result
+
+    def wait_action_result(
+        self,
+        action,
+        condition,
+        expect=None,
+        time_out: float = 5.0,
+        settle_time: float = 0.0,
+        max_attempts: int = 1,
+        action_delay: float = 0.0,
+        after_sleep: float = 0.0,
+        expect_time_out: float = 1.0,
+        expect_settle_time: float = 0.0,
+        while_condition=None,
+        repeat_action=None,
+        repeat_interval: float = 0.0,
+        max_repeat: int = 0,
+        draw: bool = False,
+        raise_if_not_found: bool = False,
+    ) -> bool:
+        """执行一次完整 Action 生命周期：等条件 → 动作 → 验证结果。
+
+        三阶段流程：
+
+        1. **等条件**：``condition`` 在 ``time_out`` 内命中才继续；未命中则返回 False。
+        2. **动作 + 验证**：执行 ``action``，再用 ``expect`` 验证；
+           未通过则重试，最多 ``max_attempts`` 次。
+        3. **持续阶段**（仅当给出 ``while_condition``）：只要 ``while_condition``
+           持续命中就重复执行 ``repeat_action``；一旦未命中立即停止；
+           每轮之后继续检查 ``expect``，命中即结束并判定成功。
+
+        Args:
+            action: 主动作，签名 ``action(hit: Hit) -> bool | None``。
+            condition: 前置条件判据（A）。
+            expect: 预期结果判据（C）。``None`` 表示「动作成功即返回」
+                （调用方声明该动作没有可验证的结果）。
+            time_out: 等待 ``condition`` 命中的总超时。
+            settle_time: ``condition`` 需持续成立的秒数；0（默认）= 命中一次即可。
+                ⚠️ 非 0 时每次判定都要求连续成立够时长，会显著增加耗时。
+            max_attempts: 动作最多执行的次数（含首次）。``expect`` 未通过时会继续下一轮。
+            action_delay: 每次动作前的延时。
+            after_sleep: 每次动作后的延时。
+            expect_time_out: 每次验证 ``expect`` 的等待时间。
+            expect_settle_time: ``expect`` 需持续成立的秒数；含义同 ``settle_time``。
+            while_condition: 持续条件判据（B）；``None`` 时跳过持续阶段。
+            repeat_action: 持续阶段重复执行的动作，签名 ``repeat_action(hit) -> None``。
+            repeat_interval: 持续阶段每轮动作的前置延时。
+            max_repeat: 持续阶段的动作次数上限；0 表示只受 ``time_out`` 约束。
+            draw: 是否画调试框。注意框 4 秒过期，长循环会重复绘制。
+            raise_if_not_found: 条件未命中时是否抛 ``WaitFailedException``。
+
+        Returns:
+            bool: 生命周期成功返回 True，否则 False。
+
+        Example:
+            >>> # A≠C：看到宝箱图标 → 点击 → 等解锁界面出现
+            >>> self.wait_action_result(
+            ...     condition=TemplateDetector(FeatureList.treasure_icon),
+            ...     action=lambda hit: self.click(hit.box),
+            ...     expect=TemplateDetector(FeatureList.unlock_ui),
+            ...     time_out=5, expect_time_out=1.5, max_attempts=2,
+            ... )
+        """
+        condition = self._resolve_detector(condition)
+        expect = self._resolve_detector(expect)
+        while_condition = self._resolve_detector(while_condition)
+
+        # ── 阶段一：等待前置条件成立 ──
+        start = self.active_time()
+        hit = None
+        while self.active_time() - start <= time_out:
+            frame = self.next_frame()
+            hit = condition.detect(frame) if condition else None
+            if hit:
+                break
+            self.sleep(0.01)
+
+        if not hit:
+            if raise_if_not_found:
+                raise WaitFailedException()
+            return False
+
+        # settle：要求条件「持续成立」够长时间才认为稳定
+        if settle_time > 0:
+            def _still_holds():
+                return bool(condition.detect(self.next_frame()))
+
+            stable = self.wait_until(
+                _still_holds,
+                time_out=settle_time,
+                settle_time=settle_time,
+                raise_if_not_found=False,
+            )
+            if not stable:
+                if raise_if_not_found:
+                    raise WaitFailedException()
+                return False
+
+        # ── 阶段二：执行动作并验证结果 ──
+        if max_attempts < 1:
+            max_attempts = 1
+
+        for attempt in range(max_attempts):
+            # 条件在 t0 命中，但若 settle_time > 0，动作发生在 t0 + settle_time，
+            # 此时目标可能已位移（会动的图标）。重取一帧；取不到则沿用旧值，
+            # 不因单帧抖动放弃。
+            fresh = condition.detect(self.next_frame()) if condition else None
+            target = fresh if fresh is not None else hit
+
+            if draw:
+                self.draw_boxes(f"action_{condition.name}", [target.box], color="green")
+
+            if action_delay > 0:
+                self.sleep(action_delay)
+            action(target)
+            if after_sleep > 0:
+                self.sleep(after_sleep)
+
+            if expect is None:
+                return True
+
+            result = self.wait_expectation(
+                expect,
+                time_out=expect_time_out,
+                settle_time=expect_settle_time,
+            )
+            if result:
+                return True
+            # expect 未通过 → 继续下一轮 attempt
+
+        # ── 阶段三：持续阶段（B 成立期间重复执行附加动作）──
+        if while_condition is None or repeat_action is None:
+            return False
+
+        deadline = self.active_time() + time_out
+        repeat_count = 0
+        while self.active_time() < deadline:
+            if max_repeat and repeat_count >= max_repeat:
+                break
+
+            frame = self.next_frame()
+            hit_b = while_condition.detect(frame)
+            if not hit_b:
+                # B 未命中 → 立即停止附加动作
+                break
+
+            if draw:
+                self.draw_boxes(f"while_{while_condition.name}", [hit_b.box], color="blue")
+
+            if repeat_interval > 0:
+                self.sleep(repeat_interval)
+            repeat_action(hit_b)
+            repeat_count += 1
+
+            if expect is not None:
+                result = self.wait_expectation(
+                    expect,
+                    time_out=expect_time_out,
+                    settle_time=expect_settle_time,
+                )
+                if result:
+                    return True
+
+        return False
 
     # ── 组合等待点击 ───────────────────────────────────
 

@@ -30,6 +30,7 @@ from __future__ import annotations
 from ok import Box, TriggerTask
 
 from src.core.BaseGameTask import BaseGameTask
+from src.core.detector import PredicateDetector
 from src.data.FeatureList import FeatureList
 from src.icons import Icons
 from src.image.treasure_band_detector import (
@@ -130,8 +131,8 @@ class TreasureUnlockTask(BaseGameTask, TriggerTask):
         if not self.find_one(
             feature=FeatureList.treasure_icon,
             frame=frame,
-            horizontal_variance=0.02,
-            vertical_variance=0.02,
+            horizontal_variance=0.01,
+            vertical_variance=0.01,
         ):
             return
         self.log_info("检测到宝箱，进入条带校准阶段", notify=True)
@@ -199,7 +200,7 @@ class TreasureUnlockTask(BaseGameTask, TriggerTask):
             elif self.active_time() - self._key_missing_since > float(self.config.get("_钥匙丢失超时(秒)", 3.0)):
                 # 钥匙长时间不见：可能是已完成，也可能是界面关了
                 if not self.find_one(feature=FeatureList.treasure_icon, frame=frame,
-                                     horizontal_variance=0.02, vertical_variance=0.02):
+                                     horizontal_variance=0.01, vertical_variance=0.01):
                     self.log_info("开锁界面已关闭，回到等待宝箱")
                     self._reset()
                 else:
@@ -218,11 +219,16 @@ class TreasureUnlockTask(BaseGameTask, TriggerTask):
     def _click_band(self, band: Box):
         """点击条带，并用「稳定消失」确认生效。"""
         self.click(band)
-        gone = self.wait_until(
-            lambda: not self._band_present(self.next_frame(), band),
+        # 预期结果：条带消失。判据本身只关心「还在不在」，
+        # 点击目标由 band 提供（已点过，这里只用于取帧判定）。
+        gone = self.wait_expectation(
+            PredicateDetector(
+                lambda frame: not self._band_present(frame, band),
+                box=band,
+                name=f"band_gone_y{band.y}",
+            ),
             time_out=float(self.config.get("_消失确认超时(秒)", 3.0)),
             settle_time=float(self.config.get("_消失确认时长(秒)", 0.35)),
-            raise_if_not_found=False,
         )
         if not gone:
             self._on_click_failed(band)
@@ -279,8 +285,8 @@ class TreasureUnlockTask(BaseGameTask, TriggerTask):
         icon_gone = not self.find_one(
             feature=FeatureList.treasure_icon,
             frame=frame,
-            horizontal_variance=0.02,
-            vertical_variance=0.02,
+            horizontal_variance=0.01,
+            vertical_variance=0.01,
         )
         if icon_gone or clean >= needed * 2:
             self.log_info("宝箱开锁完成", notify=True)
