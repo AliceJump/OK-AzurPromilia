@@ -170,42 +170,14 @@ self.find_button(box, thresholds=SKIP_BUTTON)
 
 ## Action 生命周期：等条件 → 动作 → 验证
 
-游戏里大量操作是同一个形状：**看到某个东西 → 点它 → 确认出现了预期结果**。
-这类「识别 + 动作 + 再识别」的流程以前散落在各任务里各写各的，现在收敛成两个 API：
+游戏里大量操作是同一个形状：**看到某个东西 → 动它 → 确认预期结果出现了**。
+这类「识别 + 动作 + 再识别」的流程收敛成两个 API：
 
-- **识别层** `src/core/detector/` —— 把四类识别源归一成统一判据 `Detector.detect(frame) -> Hit | None`；
+- **识别层** `src/core/detector/` —— 把模板 / YOLO / OCR / 按钮四类识别源归一成统一判据
+  `Detector.detect(frame) -> Hit | None`；
 - **编排层** `RuntimeMixin.wait_action_result` / `wait_expectation` —— 负责「何时执行动作、何时判定成功」。
 
 两层正交：识别层只管「这一帧有没有」，编排层只管「什么时候做、做几次」。
-
-### 识别层：统一判据
-
-四类识别源的返回值原本各不相同（`Box | None` / `list[Box]` / …），这里统一归一成 `Hit`：
-
-| 识别源 | 适配器 | 包装的底层原语 |
-|------|------|------|
-| 模板匹配 | `TemplateDetector(feature, box=..., ...)` | `find_feature` / `find_one` |
-| YOLO | `YoloDetector(name, box=..., conf=..., pick=...)` | `yolo_detect` |
-| OCR | `OcrDetector(match, box=..., pick=...)` | `ocr` |
-| 固定 Box 按钮 | `ButtonDetectorAdapter(box, thresholds=...)` | `find_button` |
-| 任意布尔 / 自定义 | `PredicateDetector(fn, box=...)` | 调用方自备的 `frame -> Box \| bool` |
-
-组合与兜底：
-
-| 组合器 | 语义 |
-|------|------|
-| `MultiBoxDetector([d1, d2, ...])` | 多区域回退：按序取首个命中，**可混用不同识别源** |
-| `FirstHitDetector` | `MultiBoxDetector` 的语义别名 |
-| `InvertedDetector(inner, box=...)` | 取反（如「某东西消失了」）。**必须显式给 `box`**，否则没有可返回的坐标 |
-| `BlindPointDetector(x, y)` | 恒命中的盲点击兜底（原 `blind_point` 参数改由此表达） |
-
-`Hit` 承载 `box` / `confidence` / `source` / `text` / `raw` / `metrics`，所以 OCR 命中的文本、
-YOLO 的置信度都能一路带到动作回调里；`hit.box` 可直接喂给 `self.click(hit.box)`。
-
-判据**不需要手动 `attach`** —— 编排入口会调用 `_resolve_detector` 自动绑定宿主任务
-（组合器会递归绑定内部判据）。
-
-### 编排层：三阶段
 
 ```python
 from src.core.detector import TemplateDetector
@@ -226,36 +198,21 @@ self.wait_action_result(
 | ② 动作 + 验证 | 条件命中后 | `action(hit)` → `expect` 验证；未通过则重试，最多 `max_attempts` 次 |
 | ③ 持续阶段 | 仅当给了 `while_condition` **且** `repeat_action` | `while_condition` 持续命中就重复 `repeat_action`；**未命中立即停止**；每轮后继续检查 `expect`，命中即返回 `True` |
 
-单独等一个结果（只用到 C）则走 `wait_expectation`：
+只等一个结果（只用到 C）则走 `wait_expectation`：
 
 ```python
-hit = self.wait_expectation(
-    TemplateDetector(FeatureList.main_ui),
-    time_out=2.0,
-)
-if hit:
-    ...
+hit = self.wait_expectation(TemplateDetector(FeatureList.main_ui), time_out=2.0)
 ```
 
-### 契约与注意事项
+三条最容易踩的契约：
 
-- **`expect=None` 表示「动作成功即返回」** —— 调用方声明该动作没有可验证的结果，阶段②立即返回 `True`。
-- **`settle_time` 默认 0（命中一次即可）**。非 0 时语义是「**每次判定**都要求连续成立够时长」，
+- **`expect=None` 表示「动作成功即返回」** —— 调用方声明该动作没有可验证的结果。
+- **`settle_time` 默认 0（命中一次即可）**；非 0 的语义是「**每次判定**都要求连续成立够时长」，
   而不是「总共等这么久」—— 会显著增加耗时，只在「等 UI 稳定下来再确认」时开启。
-  这与框架 `wait_until` 的 `settle_time` 语义一致。
-- **条件命中与动作之间会重取一帧**（`condition.detect(self.next_frame())`）：`settle_time > 0` 时
-  动作发生在条件命中之后若干毫秒，会动的目标那时可能已位移。取不到则沿用旧命中值，不因单帧抖动放弃。
-- **计时用 `active_time()`**（暂停感知），脚本暂停期间不消耗 `time_out`。
-- **`draw=True` 复用 `draw_boxes` 调试框**，颜色约定：绿 = 动作目标（A），蓝 = 持续目标（B）。
-  注意框 **4 秒过期**，长循环里会重复绘制。
-- 返回 `False` 时轮次已用尽，调用方据此决定重试、跳过或记录失败，不要在里面再写一层 `while True`。
+- **条件命中与动作之间会重取一帧**，防止会动的目标在 `settle_time` 期间位移。
 
-### 什么时候不该用它
-
-- **只等一个结果** → 用 `wait_expectation`，别用 `wait_action_result` 包一层空动作。
-- **只需要「等到就点」** → 用现成的 `wait_click_feature` / `wait_click_ocr` / `wait_click_box`。
-- **等待只应发生在「即将点击的那一次」**：给「查找」类函数加 `settle_time` 会让每帧都变慢
-  （历史上有过这个改动并被回滚）。
+> 📖 **完整参考见 [`ACTION_LIFECYCLE.md`](ACTION_LIFECYCLE.md)** —— 含全部识别器参数（`pick` 策略、
+> `mask_function`、`use_find_one` 等）、组合器语义、典型配方、迁移对照表与真实落地样例。
 
 ## 辅助星结：可射击光圈检测与辅助任务
 
