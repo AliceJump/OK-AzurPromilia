@@ -4,7 +4,7 @@ from unittest import mock
 from ok import WaitFailedException
 
 from src.data.page import Page
-from src.tasks.test.TestUINavigateTask import TestUINavigateTask
+from src.tasks.test.test_ui_navigate_task import TestUINavigateTask
 
 
 def build_task(debug=True):

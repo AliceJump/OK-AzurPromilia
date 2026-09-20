@@ -17,8 +17,9 @@
 
 ## 代码风格
 
+- Python 模块文件用 `snake_case.py`，`tests/` 下用 `test_*.py`；类名仍用 `PascalCase`。
 - 任务类基于 ok-script：`BaseTask` / `TriggerTask`，
-  **本项目通用基类为 `src/core/BaseGameTask.py`**（不要直接继承 `BaseTask`）。
+  **本项目通用基类为 `src/core/base_game_task.py`**（不要直接继承 `BaseTask`）。
 - 任务字符串国际化：UI 文案走 `self.tr()` + `i18n/*/LC_MESSAGES/ok.po`；
   OCR 匹配文本走 `assets/lang/*.json` + `self.lang.<模块>.<key>`。两者**不要混用**。
 - 新增任务后必须在 `src/config.py` 的 `onetime_tasks` / `trigger_tasks` 中注册。

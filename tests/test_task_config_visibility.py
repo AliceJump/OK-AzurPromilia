@@ -13,13 +13,13 @@
 import unittest
 from unittest import mock
 
-from src.tasks.onetime.TestScreenshotTask import TestScreenshotTask
-from src.tasks.test.TestInteractionTask import TestInteractionTask
-from src.tasks.test.TestTreasureBandTask import TestTreasureBandTask
-from src.tasks.test.TestUINavigateTask import TestUINavigateTask
-from src.tasks.trigger.SkipDialogTask import SkipDialogTask
-from src.tasks.trigger.StarLinkAssistTask import StarLinkAssistTask
-from src.tasks.trigger.TreasureUnlockTask import TreasureUnlockTask
+from src.tasks.test.test_screenshot_task import TestScreenshotTask
+from src.tasks.test.test_interaction_task import TestInteractionTask
+from src.tasks.test.test_treasure_band_task import TestTreasureBandTask
+from src.tasks.test.test_ui_navigate_task import TestUINavigateTask
+from src.tasks.trigger.skip_dialog_task import SkipDialogTask
+from src.tasks.trigger.star_link_assist_task import StarLinkAssistTask
+from src.tasks.trigger.treasure_unlock_task import TreasureUnlockTask
 
 #: 纯调试任务：应满足 visible == debug
 DEBUG_TASKS = [TestScreenshotTask, TestInteractionTask, TestTreasureBandTask, TestUINavigateTask]

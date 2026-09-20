@@ -1,4 +1,4 @@
-from src.core.BaseGameTask import BaseGameTask
+from src.core.base_game_task import BaseGameTask
 from src.icons import Icons
 
 

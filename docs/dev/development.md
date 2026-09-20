@@ -4,6 +4,8 @@
 
 本项目基于 [ok-script](https://github.com/ok-oldking/ok-script)。应用配置集中在 `src/config.py`，任务与 Tab 均在此注册。
 
+Python 模块文件统一用 `snake_case.py`，`tests/` 中的测试文件用 `test_*.py`；类名保持 `PascalCase`。
+
 **框架版本锁定 `ok-script==2.0.6`**（`pyproject.toml` + `uv.lock` 为唯一来源）。
 
 ### 目录职责
@@ -12,7 +14,7 @@
 |------|------|
 | `main.py` / `main_debug.py` | 入口（Release / Debug）。启动前先装 `src/patches/` |
 | `src/config.py` | ok-script 应用配置：窗口、OCR、模板匹配、任务与 Tab 注册 |
-| `src/core/BaseGameTask.py` | **任务基类**：暂停感知计时、配置迁移、异常处理、配置分组 |
+| `src/core/base_game_task.py` | **任务基类**：暂停感知计时、配置迁移、异常处理、配置分组 |
 | `src/core/base_mixin/runtime_mixin.py` | 通用能力库：分辨率映射、点击验证、YOLO 检测、画面稳定判定、键鼠 |
 | `src/core/base_mixin/framework_override_mixin.py` | 用"同名覆写 + `super()`"扩展框架方法（不复制框架代码） |
 | `src/core/detector/` | **识别层**：把四类识别源（模板 / YOLO / OCR / 按钮）归一成统一判据 `Hit` / `Detector`，供 Action 生命周期编排使用 |
@@ -28,7 +30,7 @@
 | `src/tasks/account/` | 账号作用域配置存储 |
 | `src/gui/` | 自定义 Tab（全局配置页、账号配置页） |
 | `src/patches/` | 启动补丁。**是对框架内部实现的猴子补丁，升级 ok-script 前必须逐个复核** |
-| `src/data/FeatureList.py` | 模板名枚举（**由标注自动生成**，代码里不要写裸字符串模板名） |
+| `src/data/feature_list.py` | 模板名枚举（**由标注自动生成**，代码里不要写裸字符串模板名） |
 | `src/data/lang/` | `assets/lang/*.json` 的读取器 |
 | `assets/coco_annotations.json` | 模板标注（COCO 格式） |
 | `assets/lang/` | **OCR 匹配文本**（不是 UI 文案） |
@@ -82,7 +84,7 @@ TreasureBandDetector.hit_by_center_y(bands, 580)  # 钥匙 center_y 落在哪条
 占比（`presence`），不看形状。真实截图实测：条带在 0.99，被抹掉后 0.00，
 阈值 0.15 有充足余量。
 
-### 开锁任务 `src/tasks/trigger/TreasureUnlockTask.py`
+### 开锁任务 `src/tasks/trigger/treasure_unlock_task.py`
 
 触发式任务，状态机跨 `run()` 调用保持：
 
@@ -107,7 +109,7 @@ WAIT_TREASURE ──treasure_icon──> CALIBRATING_BANDS ──连续多帧稳
 - `treasure_key_icon` **必须显式传搜索 box**：`find_feature` 不传 box 时只搜 coco
   标注位置 ±variance（约 4px），而钥匙会沿轨道上下滑动，默认框根本搜不到。
 
-调试任务 `src/tasks/test/TestTreasureBandTask.py` 会在覆盖层实时画框
+调试任务 `src/tasks/test/test_treasure_band_task.py` 会在覆盖层实时画框
 （红=命中 / 绿=ROI / 蓝=被过滤），用来肉眼校准阈值。
 
 ## 固定 Box 按钮检测（中央文本带，无 OCR）
@@ -181,7 +183,7 @@ self.find_button(box, thresholds=SKIP_BUTTON)
 
 ```python
 from src.core.detector import TemplateDetector
-from src.data.FeatureList import FeatureList
+from src.data.feature_list import FeatureList
 
 # A≠C：看到宝箱图标 → 点击 → 等解锁界面出现
 self.wait_action_result(
@@ -211,7 +213,7 @@ hit = self.wait_expectation(TemplateDetector(FeatureList.main_ui), time_out=2.0)
   而不是「总共等这么久」—— 会显著增加耗时，只在「等 UI 稳定下来再确认」时开启。
 - **条件命中与动作之间会重取一帧**，防止会动的目标在 `settle_time` 期间位移。
 
-> 📖 **完整参考见 [`ACTION_LIFECYCLE.md`](ACTION_LIFECYCLE.md)** —— 含全部识别器参数（`pick` 策略、
+> 📖 **完整参考见 [`action_lifecycle.md`](action_lifecycle.md)** —— 含全部识别器参数（`pick` 策略、
 > `mask_function`、`use_find_one` 等）、组合器语义、典型用法配方与真实落地样例。
 
 ## 辅助星结：可射击光圈检测与辅助任务
@@ -259,7 +261,7 @@ box = detector.find(frame, roi)                    # 命中的帧坐标 Box，�
 
 `require_arc=False` 可退回「最大彩色团块」模式，用于提示本身是实心色块的画面。
 
-### 任务 `src/tasks/trigger/StarLinkAssistTask.py`
+### 任务 `src/tasks/trigger/star_link_assist_task.py`
 
 触发式任务，`run()` 里三道闸门依次短路：
 
@@ -316,7 +318,7 @@ self.visible = self.debug      # self.debug -> executor.debug，main_debug.py �
 正式业务任务**不要**设 `visible`，任何模式下都应可见。当前按此约定归类的调试任务是
 `TestScreenshotTask`、`TestInteractionTask`、`TestTreasureBandTask`。
 
-两条契约都由 `tests/TestTaskConfigVisibility.py` 固化，改配置项时会被它挡住。
+两条契约都由 `tests/test_task_config_visibility.py` 固化，改配置项时会被它挡住。
 
 ## 配置键迁移
 
@@ -346,7 +348,7 @@ class MyTask(BaseGameTask):
   新增文案时，先用 `scan` 把该进 `.po` 的字符串列出来，避免漏翻：
 
   ```bash
-  python tools/task_i18n_helper.py scan --task src/tasks/onetime/DailyTask.py
+  python tools/task_i18n_helper.py scan --task src/tasks/onetime/daily_task.py
   ```
 
 - **OCR 匹配文本**：放进 `assets/lang/<模块>.json`，每 key 下 6 种语言节点，

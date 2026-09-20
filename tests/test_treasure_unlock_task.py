@@ -10,9 +10,9 @@ import cv2
 import numpy as np
 from ok import Box
 
-from src.data.FeatureList import FeatureList
+from src.data.feature_list import FeatureList
 from src.image.treasure_band_detector import TreasureBandDetector
-from src.tasks.trigger.TreasureUnlockTask import TreasureUnlockTask
+from src.tasks.trigger.treasure_unlock_task import TreasureUnlockTask
 
 FRAME_WIDTH, FRAME_HEIGHT = 1920, 1080
 ROI = Box(1305, 251, 43, 589)

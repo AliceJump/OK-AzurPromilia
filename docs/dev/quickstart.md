@@ -20,24 +20,24 @@ uv run python main_debug.py
 
 ## 3. 新增一个一次性任务
 
-1. 在 `src/tasks/onetime/` 下新建文件，继承 `BaseGameTask`（最简范例见 `src/tasks/onetime/TestScreenshotTask.py`）。
+1. 在 `src/tasks/onetime/` 下新建文件，继承 `BaseGameTask`（最简范例见 `src/tasks/test/test_screenshot_task.py`）。
 2. 在 `__init__` 中设置 `name`、`description`、`icon` 与 `default_config`。
 3. 实现 `run(self)`，使用 `self.wait_ocr` / `self.wait_click_feature` / `self.click_relative` 等 API。
    若是「看到某东西 → 点它 → 验证结果」这类流程，用 `self.wait_action_result`（识别源适配器见
-   `src/core/detector/`）；只等一个结果用 `self.wait_expectation`。详见 `DEVELOPMENT.md` 的
+   `src/core/detector/`）；只等一个结果用 `self.wait_expectation`。详见 `development.md` 的
    「Action 生命周期」一节。
-4. 在 `src/config.py` 的 `onetime_tasks` 中注册：`["src.tasks.onetime.MyTask", "MyTask"]`。
+4. 在 `src/config.py` 的 `onetime_tasks` 中注册：`["src.tasks.onetime.my_task", "MyTask"]`。
 
 ## 4. 新增一个触发式任务
 
-1. 在 `src/tasks/trigger/` 下新建文件，继承 `BaseGameTask, TriggerTask`（见 `src/tasks/trigger/SkipDialogTask.py`）。
+1. 在 `src/tasks/trigger/` 下新建文件，继承 `BaseGameTask, TriggerTask`（见 `src/tasks/trigger/skip_dialog_task.py`）。
 2. 设置 `trigger_interval` 与 `default_config`。
 3. 在 `src/config.py` 的 `trigger_tasks` 中注册。
 
 ## 5. 模板匹配
 
 标记模板资源后（ok-script 的标注工具），在 debug 模式运行一次会生成
-`src/data/FeatureList.py` 枚举。之后可用 `self.wait_feature(FeatureList.xxx)`。
+`src/data/feature_list.py` 枚举。之后可用 `self.wait_feature(FeatureList.xxx)`。
 
 ## 6. 测试
 

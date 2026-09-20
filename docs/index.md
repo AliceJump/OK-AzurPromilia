@@ -6,8 +6,8 @@
 
 ## 快速导航
 
-- [从源码运行](dev/QUICKSTART.md)
-- [开发指南](dev/DEVELOPMENT.md)
+- [从源码运行](dev/quickstart.md)
+- [开发指南](dev/development.md)
 
 ## 项目结构
 
@@ -18,7 +18,7 @@
 │   ├── globals.py              全局单例
 │   ├── icons.py                图标（默认复用 FluentIcon）
 │   ├── core/
-│   │   ├── BaseGameTask.py     任务基类
+│   │   ├── base_game_task.py     任务基类
 │   │   ├── base_mixin/         通用能力 mixin（能力库 / 框架方法覆写）
 │   │   ├── config_migration.py 配置键迁移
 │   │   ├── game_window.py      按 exe + 窗口类名找游戏窗口
@@ -36,7 +36,7 @@
 │   ├── yolo/                   YOLO 模型注册与 OpenVINO 推理
 │   ├── patches/                启动补丁
 │   └── data/
-│       ├── FeatureList.py      模板匹配特征枚举（由标注生成）
+│       ├── feature_list.py      模板匹配特征枚举（由标注生成）
 │       └── lang/               lang JSON 读取器
 ├── assets/coco_annotations.json 模板标注
 ├── assets/lang/                OCR 语言 JSON

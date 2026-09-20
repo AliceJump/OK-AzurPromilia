@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ok import WaitFailedException
 
-from src.core.BaseGameTask import BaseGameTask
+from src.core.base_game_task import BaseGameTask
 from src.data.page import Page
 from src.icons import Icons
 

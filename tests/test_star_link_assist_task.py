@@ -11,8 +11,8 @@ import cv2
 import numpy as np
 from ok import Box
 
-from src.data.FeatureList import FeatureList
-from src.tasks.trigger.StarLinkAssistTask import StarLinkAssistTask
+from src.data.feature_list import FeatureList
+from src.tasks.trigger.star_link_assist_task import StarLinkAssistTask
 
 FRAME_WIDTH, FRAME_HEIGHT = 1920, 1080
 ROI = Box(907, 478, 123, 128)  # 归一化 (0.4724, 0.4426, 0.5365, 0.5611)

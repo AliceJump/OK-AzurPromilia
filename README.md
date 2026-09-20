@@ -26,7 +26,7 @@
 
   <p>
     <a href="#run-from-source">🚀 从源码运行</a> ·
-    <a href="docs/dev/DEVELOPMENT.md">📖 开发指南</a> ·
+    <a href="docs/dev/development.md">📖 开发指南</a> ·
     <a href="docs/index.md">📚 项目文档</a> ·
     <a href="https://github.com/longer-sausage/OK-AzurPromilia">⭐ 点亮小星星</a>
   </p>

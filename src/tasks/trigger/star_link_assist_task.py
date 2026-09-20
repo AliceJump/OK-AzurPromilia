@@ -43,8 +43,8 @@ from __future__ import annotations
 
 from ok import TriggerTask
 
-from src.core.BaseGameTask import BaseGameTask
-from src.data.FeatureList import FeatureList
+from src.core.base_game_task import BaseGameTask
+from src.data.feature_list import FeatureList
 from src.icons import Icons
 from src.image.glow_target_detector import (
     ALL_GLOW_COLORS,

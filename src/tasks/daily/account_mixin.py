@@ -21,7 +21,7 @@ from __future__ import annotations
 import re
 
 from src.core.account_override_mixin import AccountOverrideMixin
-from src.data.FeatureList import FeatureList
+from src.data.feature_list import FeatureList
 from src.image.hsv_config import HSVRange
 from src.image.frame_processes import make_hsv_isolator
 from src.tasks.account.account_scope_store import (

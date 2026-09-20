@@ -29,9 +29,9 @@ from __future__ import annotations
 
 from ok import Box, TriggerTask
 
-from src.core.BaseGameTask import BaseGameTask
+from src.core.base_game_task import BaseGameTask
 from src.core.detector import PredicateDetector
-from src.data.FeatureList import FeatureList
+from src.data.feature_list import FeatureList
 from src.icons import Icons
 from src.image.treasure_band_detector import (
     DEFAULT_BAND_THRESHOLDS,

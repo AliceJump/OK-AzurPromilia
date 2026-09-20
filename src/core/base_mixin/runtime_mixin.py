@@ -13,7 +13,7 @@ from ok import Box, WaitFailedException
 
 from src.config import config as app_config
 from src.core.global_config_store import KEY_CONFIG_NAME, get_global_config
-from src.data.FeatureList import FeatureList as fL
+from src.data.feature_list import FeatureList as fL
 from src.image.button_detector import (
     DEFAULT_BUTTON_THRESHOLDS,
     ButtonDetection,
@@ -21,15 +21,15 @@ from src.image.button_detector import (
     ButtonThresholds,
 )
 from src.image.frame_processes import isolate_by_hsv_ranges
-from src.interaction.Key import move_keys as send_move_keys
-from src.interaction.KeyConfig import KeyConfigManager
-from src.interaction.Mouse import (
+from src.interaction.key import move_keys as send_move_keys
+from src.interaction.key_config import KeyConfigManager
+from src.interaction.mouse import (
     active_and_send_mouse_delta as send_mouse_delta,
 )
-from src.interaction.Mouse import (
+from src.interaction.mouse import (
     move_to_target_once as move_to_target_once_impl,
 )
-from src.interaction.Mouse import (
+from src.interaction.mouse import (
     smooth_drag,
 )
 from src.yolo.loader import YoloModelLoader
@@ -363,7 +363,7 @@ class RuntimeMixin:
         """
         import pyautogui
 
-        from src.interaction.Mouse import run_at_window_pos
+        from src.interaction.mouse import run_at_window_pos
 
         if activate:
             self.active_and_send_mouse_delta(0, 0, activate=True, only_activate=True)

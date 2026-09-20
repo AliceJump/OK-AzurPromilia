@@ -1,7 +1,7 @@
 from ok import Logger, TriggerTask
 
-from src.core.BaseGameTask import BaseGameTask
-from src.data.FeatureList import FeatureList
+from src.core.base_game_task import BaseGameTask
+from src.data.feature_list import FeatureList
 from src.icons import Icons
 
 logger = Logger.get_logger(__name__)

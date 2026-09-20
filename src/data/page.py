@@ -4,7 +4,7 @@ import collections
 import traceback
 from typing import Any, ClassVar
 
-from src.data.FeatureList import FeatureList
+from src.data.feature_list import FeatureList
 from src.image.hsv_config import HSVRange
 from src.image.frame_processes import make_hsv_isolator
 

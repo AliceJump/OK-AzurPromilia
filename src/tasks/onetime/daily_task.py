@@ -13,7 +13,7 @@
 import tempfile
 from pathlib import Path
 
-from src.core.BaseGameTask import BaseGameTask
+from src.core.base_game_task import BaseGameTask
 from src.icons import Icons
 from src.tasks.daily.account_mixin import AccountMixin
 from src.tasks.daily.daily_summary import create_task_summary_report, open_local_path_with_default_app

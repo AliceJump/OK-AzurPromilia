@@ -1,7 +1,7 @@
 # Action 生命周期（完整参考）
 
 > 本文是 `wait_action_result` / `wait_expectation` 与识别层 `src/core/detector/` 的**完整使用参考**。
-> `DEVELOPMENT.md` 中的「Action 生命周期」一节是本文摘要，细节以本文为准。
+> `development.md` 中的「Action 生命周期」一节是本文摘要，细节以本文为准。
 
 ## 目录
 
@@ -36,7 +36,7 @@
   - [判据必须接受外部 `frame`](#判据必须接受外部-frame)
 - [9. 什么时候不该用它](#9-什么时候不该用它)
 - [10. 真实落地样例](#10-真实落地样例)
-  - [`TreasureUnlockTask._click_band`（`src/tasks/trigger/TreasureUnlockTask.py`）](#treasureunlocktask_click_bandsrctaskstriggertreasureunlocktaskpy)
+  - [`TreasureUnlockTask._click_band`（`src/tasks/trigger/treasure_unlock_task.py`）](#treasureunlocktask_click_bandsrctaskstriggertreasure_unlock_taskpy)
 - [相关文档](#相关文档)
 
 ---
@@ -95,7 +95,7 @@ Detector.detect(frame) -> Hit | None
 
 ```python
 from src.core.detector import TemplateDetector
-from src.data.FeatureList import FeatureList
+from src.data.feature_list import FeatureList
 
 # A ≠ C：看到宝箱图标 → 点击 → 等解锁界面出现
 ok = self.wait_action_result(
@@ -273,7 +273,7 @@ ButtonDetectorAdapter(
 
 ⚠️ **`box` 必须贴合按钮**——Box 远大于按钮时文本带相对过薄，会被形状判定拒绝。
 
-用法见 `DEVELOPMENT.md` 的「固定 Box 按钮检测」一节（含 `ButtonThresholds` 预设）。
+用法见 `development.md` 的「固定 Box 按钮检测」一节（含 `ButtonThresholds` 预设）。
 
 #### `PredicateDetector` —— 任意判据兜底
 
@@ -644,7 +644,7 @@ target = fresh if fresh is not None else hit
 
 ## 10. 真实落地样例
 
-### `TreasureUnlockTask._click_band`（`src/tasks/trigger/TreasureUnlockTask.py`）
+### `TreasureUnlockTask._click_band`（`src/tasks/trigger/treasure_unlock_task.py`）
 
 点条带后用「稳定消失」确认生效——只用到 C，所以走 `wait_expectation`：
 
@@ -681,6 +681,6 @@ def _click_band(self, band: Box):
 
 | 文档 | 内容 |
 |---|---|
-| `DEVELOPMENT.md` | 目录职责、各检测器实现细节、i18n、配置迁移 |
-| `QUICKSTART.md` | 从源码运行、开发环境搭建 |
-| `tests/TestActionLifecycle.py` | 58 例行为固化，改 API 时会被它挡住 |
+| `development.md` | 目录职责、各检测器实现细节、i18n、配置迁移 |
+| `quickstart.md` | 从源码运行、开发环境搭建 |
+| `tests/test_action_lifecycle.py` | 58 例行为固化，改 API 时会被它挡住 |

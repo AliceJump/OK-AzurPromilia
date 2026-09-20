@@ -1,7 +1,7 @@
 import os
 
 import numpy as np
-from src.interaction.GameInteraction import GameInteraction
+from src.interaction.game_interaction import GameInteraction
 
 version = "dev"
 
@@ -63,7 +63,7 @@ config = {
         'generate_label_enum': True,
 
         # 标签枚举的相对路径
-        'label_enum_relative_path': 'src/data/FeatureList',
+        'label_enum_relative_path': 'src/data/feature_list',
     },
     'item_map': {
         # 物品地图数据的相对路径（如有）
@@ -102,19 +102,19 @@ config = {
     "version": version,  # 版本
     "my_app": ["src.globals", "Globals"],  # 可选. 全局单例对象, 可以存放加载的模型, 使用og.my_app调用
     "onetime_tasks": [  # 用户点击触发的任务（一次性业务任务在前，调试/测试任务在后）
-        ["src.tasks.onetime.DailyTask", "DailyTask"],
-        ["src.tasks.onetime.TestScreenshotTask", "TestScreenshotTask"],
-        ["src.tasks.test.TestInteractionTask", "TestInteractionTask"],
-        ["src.tasks.test.TestTreasureBandTask", "TestTreasureBandTask"],
-        ["src.tasks.test.TestUINavigateTask", "TestUINavigateTask"],
+        ["src.tasks.onetime.daily_task", "DailyTask"],
+        ["src.tasks.test.test_screenshot_task", "TestScreenshotTask"],
+        ["src.tasks.test.test_interaction_task", "TestInteractionTask"],
+        ["src.tasks.test.test_treasure_band_task", "TestTreasureBandTask"],
+        ["src.tasks.test.test_ui_navigate_task", "TestUINavigateTask"],
     ],
     "custom_tabs": [
-        ["src.gui.GlobalConfigTab", "GlobalConfigTab"],
-        ["src.gui.AccountConfigTab", "AccountConfigTab"],
+        ["src.gui.global_config_tab", "GlobalConfigTab"],
+        ["src.gui.account_config_tab", "AccountConfigTab"],
     ],
     "trigger_tasks": [  # 不断执行的触发式任务
-        ["src.tasks.trigger.SkipDialogTask", "SkipDialogTask"],
-        ["src.tasks.trigger.StarLinkAssistTask", "StarLinkAssistTask"],
-        ["src.tasks.trigger.TreasureUnlockTask", "TreasureUnlockTask"],
+        ["src.tasks.trigger.skip_dialog_task", "SkipDialogTask"],
+        ["src.tasks.trigger.star_link_assist_task", "StarLinkAssistTask"],
+        ["src.tasks.trigger.treasure_unlock_task", "TreasureUnlockTask"],
     ],
 }

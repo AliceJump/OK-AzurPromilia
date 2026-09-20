@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import cv2
 
-from src.data.FeatureList import FeatureList as fL
+from src.data.feature_list import FeatureList as fL
 from src.image.hsv_config import HSVRange as hR
-from src.interaction.Mouse import run_at_window_pos
+from src.interaction.mouse import run_at_window_pos
 
 
 class FrameworkOverrideMixin:

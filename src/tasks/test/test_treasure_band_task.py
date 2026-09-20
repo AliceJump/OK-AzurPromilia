@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from ok import Box
 
-from src.core.BaseGameTask import BaseGameTask
+from src.core.base_game_task import BaseGameTask
 from src.icons import Icons
 from src.image.treasure_band_detector import (
     DEFAULT_BAND_THRESHOLDS,
