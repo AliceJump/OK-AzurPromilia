@@ -461,12 +461,12 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
             frame=frame
         )
 
-    def find_with_scroll(
+    def _find_with_scroll(
         self,
         feature_name,
         box,
         scroll_count=-3,
-        max_scrolls=10,
+        max_scrolls=5,
         delay=0.2,
         horizontal_variance=0,
         vertical_variance=0,
@@ -512,5 +512,42 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
             if last_hash is not None and hamming_distance(last_hash, current_hash) <= 1:
                 raise CannotFindException('Cannot find with scroll.')
             last_hash = current_hash
+
+        raise CannotFindException('Cannot find with scroll.')
+
+    def find_with_scroll(
+        self,
+        feature_name,
+        box,
+        scroll_count=-3,
+        max_scrolls=5,
+        delay=0.2,
+        max_attempts=3,
+        horizontal_variance=0,
+        vertical_variance=0,
+        threshold=0,
+        use_gray_scale=False,
+        canny_lower=0, canny_higher=0,
+        frame_processor=None,
+        template=None,
+        mask_function=None,
+        frame=None,
+        match_method=cv2.TM_CCOEFF_NORMED,
+        screenshot=False,
+        limit=1,
+        target_height=0,
+    ):
+        for _ in range(max_attempts):
+            try:
+                return self._find_with_scroll(
+                    feature_name, box, scroll_count, max_scrolls, delay, horizontal_variance, vertical_variance,
+                    threshold, use_gray_scale, canny_lower, canny_higher,
+                    frame_processor, template, mask_function, frame,
+                    match_method, screenshot, limit, target_height
+                )
+            except CannotFindException:
+                scroll_x, scroll_y = box.center()
+                self.scroll(scroll_x, scroll_y, -scroll_count * max_scrolls)
+                time.sleep(delay)
 
         raise CannotFindException('Cannot find with scroll.')
