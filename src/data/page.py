@@ -194,7 +194,7 @@ class Page:
         需手动调用 `Page.build()` 解析并正式建立拓扑图。
 
         Args:
-            button: 点击目标（Box、特征名称、坐标或无参回调函数）。
+            button: 点击目标（Box、特征名称、坐标或以 task 为参数的回调函数）。
             destination: 目标页面实例或页面名称（可引用尚未定义的 Page 名称）。
             back_button: 可选的反向返回动作。
 

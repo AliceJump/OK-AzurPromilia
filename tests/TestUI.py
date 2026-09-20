@@ -247,9 +247,11 @@ class TestUIMixin(unittest.TestCase):
         p_dest = Page("feat_dest", name="dest")
 
         callback_called = []
+        received_tasks = []
 
-        def custom_action():
+        def custom_action(task):
             callback_called.append(True)
+            received_tasks.append(task)
             self.task.current_features = {"feat_dest"}
 
         p_start.link(custom_action, p_dest)
@@ -259,6 +261,7 @@ class TestUIMixin(unittest.TestCase):
         success = self.task.ui_goto("dest", time_out=5.0)
         self.assertTrue(success)
         self.assertEqual(len(callback_called), 1)
+        self.assertIs(received_tasks[0], self.task)
 
     def test_ui_goto_unknown_destination(self):
         with self.assertRaises(KeyError):
