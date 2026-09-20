@@ -96,9 +96,9 @@ class UIMixin:
             Page.clear_connection()
 
     def _ui_execute_action(self, button: Any) -> None:
-        """执行页面切换动作（支持无参回调或点击目标）。"""
+        """执行页面切换动作（以 task 为参数的回调或点击目标）。"""
         if callable(button):
-            button()
+            button(self)
         elif button is not None:
             self.click(button)
 

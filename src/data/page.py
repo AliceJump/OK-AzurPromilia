@@ -204,6 +204,35 @@ class Page:
         self._pending_links.append((button, destination, back_button))
         return self
 
+def _send_key(key):
+    return lambda task: task.send_key(key)
+
+def _click_box(x, y, to_x, to_y):
+    return lambda task: task.click(task.box_of_screen(x, y, to_x, to_y))
+
+def _find_with_scroll_then_click(feature, box):
+    return lambda task: task.click(task.find_with_scroll(feature, task.box_of_screen(*box)))
+
 page_main = Page(FeatureList.char_button, check_kwargs={'mask_function': make_hsv_isolator(HSVRange.WHITE, invert=False)})
+
+# menu
+page_menu = Page(FeatureList.menu_backpack, check_kwargs={'mask_function': make_hsv_isolator(HSVRange.WHITE, invert=False)})
+page_main.link(_send_key('esc'), page_menu, back_button=_send_key('esc'))
+
+# home
+page_home = Page(FeatureList.home_kibi_manage, check_kwargs={'use_gray_scale': True})
+page_menu.link(_click_box(0.2276, 0.9111, 0.2401, 0.9333), page_home, back_button=_send_key('esc'))
+
+# home_building
+page_home_building = Page(FeatureList.home_building_check, check_kwargs={'mask_function': make_hsv_isolator(HSVRange.WHITE, invert=False)})
+page_home.link(_click_box(0.1380, 0.7769, 0.2010, 0.8176), page_home_building, back_button=_send_key('esc'))
+
+# home_building_crafting_table
+page_home_building_crafting_table = Page(FeatureList.crafting_table_check, check_kwargs={'mask_function': make_hsv_isolator(HSVRange.WHITE, invert=False)})
+page_home_building.link(_find_with_scroll_then_click(FeatureList.home_building_crafting_table, (0.0880, 0.1213, 0.7995, 0.8694)), page_home_building_crafting_table, back_button=_send_key('esc'))
+
+# home_restaurant
+page_home_restaurant = Page(FeatureList.home_restaurant_check, check_kwargs={'mask_function': make_hsv_isolator(HSVRange.WHITE, invert=False)})
+page_home.link(_click_box(0.0932, 0.6593, 0.1594, 0.6954), page_home_restaurant, back_button=_send_key('esc'))
 
 Page.build()

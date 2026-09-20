@@ -16,12 +16,13 @@ from unittest import mock
 from src.tasks.onetime.TestScreenshotTask import TestScreenshotTask
 from src.tasks.test.TestInteractionTask import TestInteractionTask
 from src.tasks.test.TestTreasureBandTask import TestTreasureBandTask
+from src.tasks.test.TestUINavigateTask import TestUINavigateTask
 from src.tasks.trigger.SkipDialogTask import SkipDialogTask
 from src.tasks.trigger.StarLinkAssistTask import StarLinkAssistTask
 from src.tasks.trigger.TreasureUnlockTask import TreasureUnlockTask
 
 #: 纯调试任务：应满足 visible == debug
-DEBUG_TASKS = [TestScreenshotTask, TestInteractionTask, TestTreasureBandTask]
+DEBUG_TASKS = [TestScreenshotTask, TestInteractionTask, TestTreasureBandTask, TestUINavigateTask]
 
 #: 正式业务任务：不设 visible，任何模式下都应可见
 BUSINESS_TASKS = [SkipDialogTask, StarLinkAssistTask, TreasureUnlockTask]
@@ -35,6 +36,9 @@ EXPECTED_VISIBLE_KEYS = {
     TestTreasureBandTask: [
         "V 下限", "S 上限", "最小高度", "最大宽度", "最小长宽比",
         "显示被过滤候选", "自动开启覆盖层", "结束时保存截图",
+    ],
+    TestUINavigateTask: [
+        "目标界面", "超时时间(秒)", "防抖等待(秒)",
     ],
 }
 
