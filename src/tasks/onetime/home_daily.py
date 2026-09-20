@@ -13,8 +13,6 @@ from src.icons import Icons
 
 
 class HomeDaily(BaseGameTask):
-    """测试任务：通过 UI 路由拓扑导航前往指定的 UI 界面。"""
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = "家园每日"
@@ -23,13 +21,14 @@ class HomeDaily(BaseGameTask):
 
     def claim(self):
         self.ui_ensure(page_home_building)
-        last_hit = self.wait_action_result(
+        self.wait_action_result(
             action=lambda: self.click(self.box_of_screen(0.0333, 0.8093, 0.0656, 0.8676)),
             expect=TemplateDetector(FeatureList.home_claim_cross),
             max_attempts=3
         )
         self.wait_action_result(
-            action=lambda: self.click(last_hit),
+            condition=TemplateDetector(FeatureList.home_claim_cross),
+            action=lambda hit: self.click(hit),
             expect=TemplateDetector(FeatureList.home_building_check),
             while_condition=TemplateDetector(FeatureList.home_levelup_popup),
             repeat_action=lambda: self.click(self.box_of_screen(0.4818, 0.6907, 0.5198, 0.7269)),
