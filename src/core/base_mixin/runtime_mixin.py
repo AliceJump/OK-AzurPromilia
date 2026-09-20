@@ -459,17 +459,6 @@ class RuntimeMixin:
         self._yolo_model_key = key
         return self._detector
 
-    # ── HSV / 稳定性 ───────────────────────────────────
-
-    def make_hsv_isolator(self, ranges, invert=True, kernel_size=2):
-        """返回一个可直接调用的 HSV 过滤函数"""
-        return lambda frame: isolate_by_hsv_ranges(
-            frame,
-            ranges,
-            invert=invert,
-            kernel_size=kernel_size,
-        )
-
     # ── 按钮检测：固定 Box + 中央文本带（无 OCR） ───────────────
 
     def button_detector(self, thresholds: ButtonThresholds | None = None) -> ButtonDetector:

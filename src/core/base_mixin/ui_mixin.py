@@ -18,7 +18,7 @@ class UIMixin:
         target_page = Page.get(page)
         if target_page.check_feature is None:
             return False
-        return bool(self.find_one(target_page.check_feature) is not None)
+        return bool(self.find_one(target_page.check_feature, **target_page.check_kwargs) is not None)
 
     def ui_goto(
         self,
@@ -75,7 +75,7 @@ class UIMixin:
                 for page in Page.iter_pages():
                     if page.parent is None or page.check_feature is None:
                         continue
-                    if self.find_one(page.check_feature):
+                    if self.ui_page_appear(page):
                         current_page = page
                         break
 

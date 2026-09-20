@@ -4,6 +4,10 @@ import collections
 import traceback
 from typing import Any, ClassVar
 
+from src.data.FeatureList import FeatureList
+from src.image.hsv_config import HSVRange
+from src.image.frame_processes import make_hsv_isolator
+
 
 class Page:
     """页面定义与寻路拓扑节点。
@@ -131,8 +135,9 @@ class Page:
             if page.check_feature is not None:
                 yield page.check_feature
 
-    def __init__(self, check_feature: Any = None, name: str | None = None):
+    def __init__(self, check_feature: Any = None, check_kwargs = None, name: str | None = None):
         self.check_feature = check_feature
+        self.check_kwargs = check_kwargs or {}
         self.links: dict[Page, Any] = {}
         self._pending_links: list[tuple[Any, Page | str, Any | None]] = []
         self.parent: Page | None = None
@@ -198,3 +203,7 @@ class Page:
         """
         self._pending_links.append((button, destination, back_button))
         return self
+
+page_main = Page(FeatureList.char_button, check_kwargs={'mask_function': make_hsv_isolator(HSVRange.WHITE, invert=False)})
+
+Page.build()

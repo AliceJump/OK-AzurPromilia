@@ -15,8 +15,10 @@ from src.core.config_migration import migrate_config_file_keys, migrate_config_v
 from src.core.game_window import find_game_hwnd
 from src.core.global_config_store import get_global_config
 from src.data.FeatureList import FeatureList
+from src.data.page import page_main
 from src.data.lang import get_lang_accessor
 from src.image.hsv_config import HSVRange
+from src.image.frame_processes import make_hsv_isolator
 from src.image.stability import perceptual_hash, hamming_distance
 from src.interaction.KeyConfig import KeyConfigManager
 from src.interaction.ScreenPosition import ScreenPosition
@@ -344,26 +346,13 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
             self.sleep(after_sleep)
         self.info_set("current task", self.tr("in main esc={esc}").format(esc=esc))
 
-    def in_world(self):
-        """
-        判断是否在游戏世界中（非菜单/对话状态）。
-
-        Returns:
-            bool: 当前处于游戏世界返回 True。
-        """
-        main_world_features = [FeatureList.char_button]
-
-        in_world = all(self.find_one(f, mask_function=self.make_hsv_isolator(HSVRange.WHITE, invert=False)) for f in main_world_features)
-
-        return in_world
-
     def wait_login(self):
         """
         处理登录界面的各种弹窗（月卡、签到、奖励等）。
         """
         if not self._logged_in and self.find_one(
             feature=[FeatureList.login_out],
-            mask_function=self.make_hsv_isolator(HSVRange.WHITE),
+            mask_function=make_hsv_isolator(HSVRange.WHITE),
         ):
             self.click(0.5, 0.5)
 
@@ -381,7 +370,7 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
         self.next_frame()
 
         # Stability is handled by ensure_main's outer wait.
-        if self.in_world():
+        if self.ui_page_appear(page_main):
             self._logged_in = True
             return True
         # 登录流程处理成功
