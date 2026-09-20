@@ -369,8 +369,10 @@ self.wait_action_result(
 
 ```text
 ┌─ 阶段一：等条件 ────────────────────────────────┐
+│  condition 为 None ?                             │
+│    是 → 跳过等待，直接执行动作                     │
 │  condition 在 time_out 内命中？                   │
-│    否 → raise_if_not_found ? 抛异常 : 返回 False │
+│    否 → raise_if_not_found ? 抛异常 : 返回 None   │
 │    是 → 继续（settle_time > 0 时要求持续成立）     │
 └────────────────────┬────────────────────────────┘
                      ↓
@@ -378,26 +380,26 @@ self.wait_action_result(
 │  重取一帧确定目标（防位移）                        │
 │  action_delay → action(hit) → after_sleep        │
 │  expect is None ?  → 返回 True                   │
-│  wait_expectation(expect) 命中 ? → 返回 True     │
+│  wait_expectation(expect) 命中 ? → 返回 expect Hit│
 │  未命中 → 下一轮                                  │
 └────────────────────┬────────────────────────────┘
                      ↓
 ┌─ 阶段三：持续阶段（需 while_condition 且 repeat_action）┐
 │  B 未命中 → 立即 break                            │
 │  repeat_interval → repeat_action(hit_b)          │
-│  查 expect → 命中则返回 True                      │
+│  查 expect → 命中则返回 expect Hit                │
 │  受 time_out / max_repeat 约束                    │
 └────────────────────┬────────────────────────────┘
                      ↓
-                  返回 False
+                  返回 None
 ```
 
 ### 5.2 完整参数表
 
 ```python
 wait_action_result(
-    action,                     # 必填。action(hit: Hit) -> bool | None
-    condition,                  # 必填。前置条件判据 A
+    action,                     # 必填。action(hit: Hit) -> bool | None 或 action() -> bool | None
+    condition=None,             # 前置条件判据 A，默认 None（不等条件直接执行）
     expect=None,                # 预期结果判据 C。None = 动作成功即返回
     time_out=5.0,               # 等 condition 的总超时；也约束持续阶段
     settle_time=0.0,            # condition 需持续成立的秒数
@@ -412,11 +414,17 @@ wait_action_result(
     max_repeat=0,               # 持续阶段动作次数上限；0 = 只受 time_out 约束
     draw=False,                 # 是否画调试框
     raise_if_not_found=False,   # 条件未命中时是否抛 WaitFailedException
-) -> bool
+) -> Hit | bool | None
 ```
+
+**返回值**：
+- 命中 `expect` 时返回其 `Hit` 对象（包含 `box`、`confidence`、`text`、`raw` 等，且 `bool(hit) == True`）；
+- `expect=None` 且动作成功执行时返回 `True`；
+- 条件未命中、超时或验证失败时返回 `None`。
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
+| `condition` | `None` | 前置条件判据 A；默认 `None` 表示不等条件直接执行动作 |
 | `time_out` | `5.0` | **两处生效**：阶段一等 A 的超时、阶段三的总时限 |
 | `settle_time` | `0.0` | `0` = 命中一次即可。**非 0 时是「每次判定都要求连续成立够时长」** |
 | `max_attempts` | `1` | `1` = 不重试。`expect` 未通过时才进入下一轮 |
@@ -426,11 +434,11 @@ wait_action_result(
 
 ### 5.3 动作回调签名
 
-`action` 与 `repeat_action` 都接收**当前命中对象**：
+`action` 与 `repeat_action` 兼容 0 参数与 1 参数签名（接收当前命中对象，若 `condition=None` 则 `hit` 为 `None`）：
 
 ```python
-action(hit: Hit) -> bool | None      # 返回值未被使用，写成 None 即可
-repeat_action(hit: Hit) -> None
+action(hit: Hit | None) -> bool | None  # 或 action() -> bool | None
+repeat_action(hit: Hit) -> None         # 或 repeat_action() -> None
 ```
 
 因为返回值不用，多语句回调写成 lambda 时用元组技巧：

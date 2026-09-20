@@ -196,8 +196,8 @@ self.wait_action_result(
 
 | 阶段 | 触发条件 | 行为 |
 |------|------|------|
-| ① 等条件 | 总是执行 | `condition` 在 `time_out` 内命中才继续；未命中 → 返回 `False`（`raise_if_not_found=True` 则抛 `WaitFailedException`） |
-| ② 动作 + 验证 | 条件命中后 | `action(hit)` → `expect` 验证；未通过则重试，最多 `max_attempts` 次 |
+| ① 等条件 | `condition` 不为 `None` 时 | `condition` 在 `time_out` 内命中才继续；为 `None` 时跳过等待直接进入阶段 ②；未命中 → 返回 `False`（`raise_if_not_found=True` 则抛 `WaitFailedException`） |
+| ② 动作 + 验证 | 条件命中或 `condition` 为 `None` | `action(hit)` → `expect` 验证；未通过则重试，最多 `max_attempts` 次 |
 | ③ 持续阶段 | 仅当给了 `while_condition` **且** `repeat_action` | `while_condition` 持续命中就重复 `repeat_action`；**未命中立即停止**；每轮后继续检查 `expect`，命中即返回 `True` |
 
 只等一个结果（只用到 C）则走 `wait_expectation`：

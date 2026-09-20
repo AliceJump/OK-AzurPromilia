@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import inspect
 import threading
 import time
 from enum import Enum
@@ -10,6 +11,8 @@ from enum import Enum
 import cv2
 import numpy as np
 from ok import Box, WaitFailedException
+
+from src.core.detector.hit import Hit
 
 from src.config import config as app_config
 from src.core.global_config_store import KEY_CONFIG_NAME, get_global_config
@@ -1102,10 +1105,32 @@ class RuntimeMixin:
         )
         return result
 
+    @staticmethod
+    def _invoke_action(action, target):
+        """调用动作回调，兼容 0 参数或 1 参数签名。"""
+        if action is None:
+            return None
+        try:
+            sig = inspect.signature(action)
+            pos_params = [
+                p for p in sig.parameters.values()
+                if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            ]
+            has_varargs = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in sig.parameters.values())
+            if not pos_params and not has_varargs:
+                return action()
+            return action(target)
+        except (ValueError, TypeError):
+            pass
+        try:
+            return action(target)
+        except TypeError:
+            return action()
+
     def wait_action_result(
         self,
         action,
-        condition,
+        condition=None,
         expect=None,
         time_out: float = 5.0,
         settle_time: float = 0.0,
@@ -1120,12 +1145,13 @@ class RuntimeMixin:
         max_repeat: int = 0,
         draw: bool = False,
         raise_if_not_found: bool = False,
-    ) -> bool:
+    ) -> Hit | bool | None:
         """执行一次完整 Action 生命周期：等条件 → 动作 → 验证结果。
 
         三阶段流程：
 
         1. **等条件**：``condition`` 在 ``time_out`` 内命中才继续；未命中则返回 False。
+           若 ``condition`` 为 ``None``，则跳过等待直接执行动作。
         2. **动作 + 验证**：执行 ``action``，再用 ``expect`` 验证；
            未通过则重试，最多 ``max_attempts`` 次。
         3. **持续阶段**（仅当给出 ``while_condition``）：只要 ``while_condition``
@@ -1133,11 +1159,11 @@ class RuntimeMixin:
            每轮之后继续检查 ``expect``，命中即结束并判定成功。
 
         Args:
-            action: 主动作，签名 ``action(hit: Hit) -> bool | None``。
-            condition: 前置条件判据（A）。
+            action: 主动作，签名 ``action(hit: Hit) -> bool | None`` 或 ``action() -> bool | None``。
+            condition: 前置条件判据（A），默认 ``None``（不等条件直接执行动作）。
             expect: 预期结果判据（C）。``None`` 表示「动作成功即返回」
                 （调用方声明该动作没有可验证的结果）。
-            time_out: 等待 ``condition`` 命中的总超时。
+            time_out: 等待 ``condition`` 命中的总超时；持续阶段也受此总时限约束。
             settle_time: ``condition`` 需持续成立的秒数；0（默认）= 命中一次即可。
                 ⚠️ 非 0 时每次判定都要求连续成立够时长，会显著增加耗时。
             max_attempts: 动作最多执行的次数（含首次）。``expect`` 未通过时会继续下一轮。
@@ -1146,14 +1172,16 @@ class RuntimeMixin:
             expect_time_out: 每次验证 ``expect`` 的等待时间。
             expect_settle_time: ``expect`` 需持续成立的秒数；含义同 ``settle_time``。
             while_condition: 持续条件判据（B）；``None`` 时跳过持续阶段。
-            repeat_action: 持续阶段重复执行的动作，签名 ``repeat_action(hit) -> None``。
+            repeat_action: 持续阶段重复执行的动作，签名 ``repeat_action(hit) -> None`` 或 ``repeat_action() -> None``。
             repeat_interval: 持续阶段每轮动作的前置延时。
             max_repeat: 持续阶段的动作次数上限；0 表示只受 ``time_out`` 约束。
             draw: 是否画调试框。注意框 4 秒过期，长循环会重复绘制。
             raise_if_not_found: 条件未命中时是否抛 ``WaitFailedException``。
 
         Returns:
-            bool: 生命周期成功返回 True，否则 False。
+            Hit | bool | None: 命中 ``expect`` 时返回其 ``Hit`` 对象；
+                ``expect=None`` 且动作执行成功时返回 ``True``；
+                失败或超时未命中时返回 ``None``。
 
         Example:
             >>> # A≠C：看到宝箱图标 → 点击 → 等解锁界面出现
@@ -1169,35 +1197,36 @@ class RuntimeMixin:
         while_condition = self._resolve_detector(while_condition)
 
         # ── 阶段一：等待前置条件成立 ──
-        start = self.active_time()
         hit = None
-        while self.active_time() - start <= time_out:
-            frame = self.next_frame()
-            hit = condition.detect(frame) if condition else None
-            if hit:
-                break
-            self.sleep(0.01)
+        if condition is not None:
+            start = self.active_time()
+            while self.active_time() - start <= time_out:
+                frame = self.next_frame()
+                hit = condition.detect(frame)
+                if hit:
+                    break
+                self.sleep(0.01)
 
-        if not hit:
-            if raise_if_not_found:
-                raise WaitFailedException()
-            return False
-
-        # settle：要求条件「持续成立」够长时间才认为稳定
-        if settle_time > 0:
-            def _still_holds():
-                return bool(condition.detect(self.next_frame()))
-
-            stable = self.wait_until(
-                _still_holds,
-                time_out=settle_time,
-                settle_time=settle_time,
-                raise_if_not_found=False,
-            )
-            if not stable:
+            if not hit:
                 if raise_if_not_found:
                     raise WaitFailedException()
-                return False
+                return None
+
+            # settle：要求条件「持续成立」够长时间才认为稳定
+            if settle_time > 0:
+                def _still_holds():
+                    return bool(condition.detect(self.next_frame()))
+
+                stable = self.wait_until(
+                    _still_holds,
+                    time_out=settle_time,
+                    settle_time=settle_time,
+                    raise_if_not_found=False,
+                )
+                if not stable:
+                    if raise_if_not_found:
+                        raise WaitFailedException()
+                    return None
 
         # ── 阶段二：执行动作并验证结果 ──
         if max_attempts < 1:
@@ -1210,12 +1239,12 @@ class RuntimeMixin:
             fresh = condition.detect(self.next_frame()) if condition else None
             target = fresh if fresh is not None else hit
 
-            if draw:
+            if draw and condition and target and getattr(target, "box", None) is not None:
                 self.draw_boxes(f"action_{condition.name}", [target.box], color="green")
 
             if action_delay > 0:
                 self.sleep(action_delay)
-            action(target)
+            self._invoke_action(action, target)
             if after_sleep > 0:
                 self.sleep(after_sleep)
 
@@ -1228,12 +1257,12 @@ class RuntimeMixin:
                 settle_time=expect_settle_time,
             )
             if result:
-                return True
+                return result
             # expect 未通过 → 继续下一轮 attempt
 
         # ── 阶段三：持续阶段（B 成立期间重复执行附加动作）──
         if while_condition is None or repeat_action is None:
-            return False
+            return None
 
         deadline = self.active_time() + time_out
         repeat_count = 0
@@ -1247,12 +1276,12 @@ class RuntimeMixin:
                 # B 未命中 → 立即停止附加动作
                 break
 
-            if draw:
+            if draw and getattr(hit_b, "box", None) is not None:
                 self.draw_boxes(f"while_{while_condition.name}", [hit_b.box], color="blue")
 
             if repeat_interval > 0:
                 self.sleep(repeat_interval)
-            repeat_action(hit_b)
+            self._invoke_action(repeat_action, hit_b)
             repeat_count += 1
 
             if expect is not None:
@@ -1262,9 +1291,9 @@ class RuntimeMixin:
                     settle_time=expect_settle_time,
                 )
                 if result:
-                    return True
+                    return result
 
-        return False
+        return None
 
     # ── 组合等待点击 ───────────────────────────────────
 

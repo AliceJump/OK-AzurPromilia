@@ -506,6 +506,7 @@ class TestWaitActionResult(unittest.TestCase):
             time_out=1,
         )
         self.assertTrue(result)
+        self.assertEqual(result.box, box(9, 9))
         self.assertEqual(len(self.actions), 1)
 
     def test_expect_miss_retries_up_to_max_attempts(self):
@@ -637,6 +638,108 @@ class TestWaitActionResult(unittest.TestCase):
         )
         self.assertTrue(result)
         self.assertEqual([a[0] for a in self.actions], ["main"])
+
+    # ── condition 为 None 时跳过等待直接执行 ──
+
+    def test_condition_none_executes_action_directly(self):
+        """condition 默认为 None，且不等待直接执行。"""
+        executed = []
+        result = self.task.wait_action_result(action=lambda hit: executed.append(hit))
+        self.assertTrue(result)
+        self.assertEqual(executed, [None])
+        self.assertEqual(self.task.now, 0.0)  # 没有发生 time_out 等待
+
+    def test_condition_none_with_zero_arg_action(self):
+        """action 可以是 0 参数可调用对象。"""
+        executed = []
+        result = self.task.wait_action_result(action=lambda: executed.append("run"))
+        self.assertTrue(result)
+        self.assertEqual(executed, ["run"])
+
+    def test_condition_none_with_expect(self):
+        """condition=None 时，expect 仍然正常工作并返回 expect 的 Hit。"""
+        count = []
+        result = self.task.wait_action_result(
+            action=lambda: count.append(1),
+            expect=_always(box(10, 10)),
+        )
+        self.assertTrue(result)
+        self.assertEqual(result.box, box(10, 10))
+        self.assertEqual(len(count), 1)
+
+    def test_returns_expect_hit_object(self):
+        """命中 expect 时返回 expect 的完整 Hit 对象。"""
+        expected_hit = Hit(box=box(12, 34), confidence=0.95, text="confirm")
+        detector = PredicateDetector(lambda frame: expected_hit)
+        result = self.task.wait_action_result(
+            action=lambda: None,
+            expect=detector,
+        )
+        self.assertIs(result, expected_hit)
+        self.assertEqual(result.box, box(12, 34))
+        self.assertEqual(result.text, "confirm")
+
+    def test_expect_miss_returns_none(self):
+        """expect 未命中返回 None。"""
+        result = self.task.wait_action_result(
+            action=lambda: None,
+            expect=_always(None),
+            max_attempts=1,
+        )
+        self.assertIsNone(result)
+
+    def test_condition_none_expect_miss_retries(self):
+        """condition=None 时，expect 未命中会按 max_attempts 重试。"""
+        count = []
+        result = self.task.wait_action_result(
+            action=lambda: count.append(1),
+            expect=_always(None),
+            max_attempts=3,
+        )
+        self.assertFalse(result)
+        self.assertEqual(len(count), 3)
+
+    def test_condition_none_with_draw_does_not_crash(self):
+        """condition=None 时开启 draw 不会报错。"""
+        result = self.task.wait_action_result(
+            action=lambda: None,
+            draw=True,
+        )
+        self.assertTrue(result)
+
+    def test_condition_none_raise_if_not_found_not_triggered(self):
+        """condition=None 时 raise_if_not_found 不会抛出异常，直接执行。"""
+        executed = []
+        result = self.task.wait_action_result(
+            action=lambda: executed.append("ok"),
+            raise_if_not_found=True,
+        )
+        self.assertTrue(result)
+        self.assertEqual(executed, ["ok"])
+
+    def test_zero_arg_action_with_condition(self):
+        """即便指定了 condition，0 参数 action 也能正常执行。"""
+        executed = []
+        result = self.task.wait_action_result(
+            condition=_always(box(1, 1)),
+            action=lambda: executed.append("run"),
+        )
+        self.assertTrue(result)
+        self.assertEqual(executed, ["run"])
+
+    def test_zero_arg_repeat_action(self):
+        """repeat_action 也支持 0 参数。"""
+        executed = []
+        while_hits = _sequence([box(1, 1), box(1, 1), None])
+        result = self.task.wait_action_result(
+            action=lambda: None,
+            expect=_always(None),
+            while_condition=while_hits,
+            repeat_action=lambda: executed.append("repeat"),
+            time_out=5,
+        )
+        self.assertFalse(result)
+        self.assertEqual(executed, ["repeat", "repeat"])
 
 
 class TestDetectorResolution(unittest.TestCase):
