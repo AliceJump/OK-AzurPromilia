@@ -1,9 +1,11 @@
 import time
 from datetime import datetime
 
+import cv2
+
 # 覆写框架截图时间戳格式：日期_时分秒（无毫秒）
 import ok.gui.debug.Screenshot as _ok_screenshot
-from ok import BaseTask, TaskDisabledException, TriggerTask, WaitFailedException
+from ok import BaseTask, TaskDisabledException, TriggerTask, WaitFailedException, CannotFindException
 
 from src.config import config as app_config
 from src.core.base_mixin.framework_override_mixin import FrameworkOverrideMixin
@@ -15,6 +17,7 @@ from src.core.global_config_store import get_global_config
 from src.data.FeatureList import FeatureList
 from src.data.lang import get_lang_accessor
 from src.image.hsv_config import HSVRange
+from src.image.stability import perceptual_hash, hamming_distance
 from src.interaction.KeyConfig import KeyConfigManager
 from src.interaction.ScreenPosition import ScreenPosition
 
@@ -468,4 +471,57 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
             box=self.box_of_screen(0.5753,0.6116,0.5957,0.6420),
             frame=frame
         )
-    
+
+    def find_with_scroll(
+        self,
+        feature_name,
+        box,
+        scroll_count=-3,
+        max_scrolls=10,
+        delay=0.2,
+        horizontal_variance=0,
+        vertical_variance=0,
+        threshold=0,
+        use_gray_scale=False,
+        canny_lower=0, canny_higher=0,
+        frame_processor=None,
+        template=None,
+        mask_function=None,
+        frame=None,
+        match_method=cv2.TM_CCOEFF_NORMED,
+        screenshot=False,
+        limit=1,
+        target_height=0,
+    ):
+        self.next_frame()
+
+        if result := self.find_one(
+            feature_name, horizontal_variance, vertical_variance,
+            threshold, use_gray_scale, box, canny_lower, canny_higher,
+            frame_processor, template, mask_function, frame,
+            match_method, screenshot, limit, target_height,
+        ):
+            return result
+
+        scroll_x, scroll_y = box.center()
+
+        last_hash = None
+        for _ in range(max_scrolls):
+            self.scroll(scroll_x, scroll_y, scroll_count)
+            time.sleep(delay)
+            frame = self.next_frame()
+
+            if result := self.find_one(
+                feature_name, horizontal_variance, vertical_variance,
+                threshold, use_gray_scale, box, canny_lower, canny_higher,
+                frame_processor, template, mask_function, frame,
+                match_method, screenshot, limit, target_height,
+            ):
+                return result
+
+            current_hash = perceptual_hash(box.crop_frame(frame))
+            if last_hash is not None and hamming_distance(last_hash, current_hash) <= 1:
+                raise CannotFindException('Cannot find with scroll.')
+            last_hash = current_hash
+
+        raise CannotFindException('Cannot find with scroll.')
