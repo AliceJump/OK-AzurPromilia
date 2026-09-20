@@ -83,6 +83,32 @@ class FrameworkOverrideMixin:
             match_method, screenshot, limit, target_height,
         )
 
+    def click(self, x=-1, *args, **kwargs):
+        """覆写 click，支持直接传入 Hit 对象与 None 空保护。"""
+        if "box" in kwargs and hasattr(kwargs["box"], "box"):
+            kwargs["box"] = kwargs["box"].box
+        if x is None:
+            if hasattr(self, "logger") and self.logger:
+                self.logger.warning("click: target is None, skip click")
+            return False
+        if hasattr(x, "box"):
+            x = x.box
+        elif isinstance(x, list):
+            x = [b.box if hasattr(b, "box") else b for b in x]
+        return super().click(x, *args, **kwargs)
+
+    def click_box(self, box=None, *args, **kwargs):
+        """覆写 click_box，支持直接传入 Hit 对象与 None 空保护。"""
+        if box is None:
+            if hasattr(self, "logger") and self.logger:
+                self.logger.warning("click_box: box is None, skip click")
+            return False
+        if hasattr(box, "box"):
+            box = box.box
+        elif isinstance(box, list):
+            box = [b.box if hasattr(b, "box") else b for b in box]
+        return super().click_box(box, *args, **kwargs)
+
     def scroll(self, x: int, y: int, count: int) -> None:
         """按屏幕绝对像素坐标滚轮。"""
         run_at_window_pos(self.get_game_hwnd(), super().scroll, x, y, 0.5, x, y, count)

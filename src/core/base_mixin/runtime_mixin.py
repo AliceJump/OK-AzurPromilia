@@ -1110,6 +1110,8 @@ class RuntimeMixin:
         """调用动作回调，兼容 0 参数或 1 参数签名。"""
         if action is None:
             return None
+        has_sig = False
+        takes_zero = False
         try:
             sig = inspect.signature(action)
             pos_params = [
@@ -1117,11 +1119,14 @@ class RuntimeMixin:
                 if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
             ]
             has_varargs = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in sig.parameters.values())
-            if not pos_params and not has_varargs:
-                return action()
-            return action(target)
+            has_sig = True
+            takes_zero = not pos_params and not has_varargs
         except (ValueError, TypeError):
             pass
+
+        if has_sig:
+            return action() if takes_zero else action(target)
+
         try:
             return action(target)
         except TypeError:

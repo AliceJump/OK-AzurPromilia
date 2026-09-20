@@ -27,6 +27,7 @@ from src.core.detector import (
     TemplateDetector,
     YoloDetector,
 )
+from src.core.base_mixin.framework_override_mixin import FrameworkOverrideMixin
 from src.core.base_mixin.runtime_mixin import RuntimeMixin
 
 
@@ -740,6 +741,64 @@ class TestWaitActionResult(unittest.TestCase):
         )
         self.assertFalse(result)
         self.assertEqual(executed, ["repeat", "repeat"])
+
+    def test_zero_arg_action_raising_type_error_not_wrapped(self):
+        """0 参数动作内部抛出 TypeError 时，不应被转为 'takes 0 positional arguments but 1 was given'。"""
+        def bad_action():
+            return 1 + "a"
+
+        with self.assertRaises(TypeError) as ctx:
+            self.task.wait_action_result(action=bad_action)
+        self.assertIn("unsupported operand type", str(ctx.exception))
+
+
+class TestFrameworkOverrideClick(unittest.TestCase):
+    def setUp(self):
+        class MockBaseTask:
+            def __init__(self):
+                self.calls = []
+
+            def click(self, x=-1, y=-1, *args, **kwargs):
+                self.calls.append(("click", x, y, kwargs))
+                if isinstance(x, Box):
+                    return self.click_box(x, *args, **kwargs)
+                return True
+
+            def click_box(self, box=None, *args, **kwargs):
+                self.calls.append(("click_box", box, kwargs))
+                return True
+
+        class Task(FrameworkOverrideMixin, MockBaseTask):
+            def __init__(self):
+                super().__init__()
+                self.logger = None
+
+        self.task = Task()
+
+    def test_click_hit_unpacks_box(self):
+        hit = Hit(box=box(10, 20))
+        self.task.click(hit)
+        self.assertEqual(len(self.task.calls), 2)
+        self.assertEqual(self.task.calls[0][0], "click")
+        self.assertEqual(self.task.calls[0][1], hit.box)
+        self.assertEqual(self.task.calls[1][0], "click_box")
+        self.assertEqual(self.task.calls[1][1], hit.box)
+
+    def test_click_none_safe(self):
+        result = self.task.click(None)
+        self.assertFalse(result)
+        self.assertEqual(self.task.calls, [])
+
+    def test_click_box_hit_unpacks_box(self):
+        hit = Hit(box=box(30, 40))
+        self.task.click_box(hit)
+        self.assertEqual(self.task.calls[0][0], "click_box")
+        self.assertEqual(self.task.calls[0][1], hit.box)
+
+    def test_click_keyword_box_hit_unpacks_box(self):
+        hit = Hit(box=box(50, 60))
+        self.task.click(box=hit)
+        self.assertEqual(self.task.calls[0][3]["box"], hit.box)
 
 
 class TestDetectorResolution(unittest.TestCase):
