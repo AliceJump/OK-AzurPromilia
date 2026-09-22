@@ -21,7 +21,7 @@ Python 模块文件统一用 `snake_case.py`，`tests/` 中的测试文件用 `t
 | `src/core/config_migration.py` | 配置键迁移工具（改键名时使用，防丢用户配置） |
 | `src/core/global_config_store.py` | 本项目自建的全局配置（**不走框架的 `config['global_configs']`**） |
 | `src/interaction/` | 窗口与键鼠：`GameInteraction`（自定义后台输入）、`Mouse`、`ScreenPosition`、`KeyConfig` |
-| `src/image/` | 图像算法：`rotated_template`（旋转模板匹配）、`stability`（图像指纹）、`frame_processes`、`hsv_config`、`button_detector`（固定 Box 按钮检测，无 OCR）、`glow_target_detector`（可射击光圈，HSV+圆弧拟合）、`treasure_band_detector`（开锁颜色带，HSV+连通域） |
+| `src/image/` | 图像算法：`rotated_template`（旋转模板匹配）、`stability`（图像指纹）、`frame_processes`、`hsv_config`、`button_detector`（固定 Box 按钮检测，无 OCR）、`glow_target_detector`（可射击光圈，HSV+圆弧拟合）、`treasure_band_detector`（开锁颜色带，HSV+连通域）、`rhythm_detector`（音游音符及长条头尾） |
 | `src/yolo/` | YOLO 模型注册（`models.py`）与 OpenVINO 推理 |
 | `src/tasks/onetime/` | 一次性任务 |
 | `src/tasks/trigger/` | 触发式任务 |
@@ -42,6 +42,28 @@ Python 模块文件统一用 `snake_case.py`，`tests/` 中的测试文件用 `t
 
 工程骨架已就位，但**游戏内容尚未开始**。当前空缺：`config['scene']` 帧级缓存、
 会话级流程引擎、3D 移动闭环、导航、战斗层，以及**任何视觉回归测试**。
+
+## 花瓣音游：自动演奏
+
+在触发任务中启用「自动音游」，按 F 进入花瓣音游后自动接管，结束后自动释放按键。
+蓝色用 Q、红色用 E、紫色同时按 Q/E；长条持续按住至尾部经过判定点。
+游戏需要保持前台，程序和游戏的权限等级应一致。
+
+- `src/image/rhythm_detector.py`：三枚固定说明图标作为界面闸门，HSV + 连通域识别音符头尾，
+  坐标换算至 1920×1080，兼容项目支持的 16:9 分辨率和轨道上下浮动。高亮圆形与半透明
+  长条分别识别，圆角轮廓拟合用于拆开尾部粘连的同色短音符。
+- `src/tasks/trigger/auto_rhythm_task.py`：在清晰区域建立轨迹，多帧直线拟合滚动速度，预测被
+  命中特效遮挡的音符。使用 `perf_counter` 和画面生成时间补偿截图、识别延迟；输入默认
+  提前 45 ms（内部配置 `_input_lead_ms`），按下与长条松开均补偿，长条尾部另保留 10 ms。
+  下一次截图可能跨过按键时刻时，先服务定时输入。演奏期间独占任务循环。
+- `src/patches/capture_timestamp_patch.py`：为 WGC 保留 `SystemRelativeTime`，100 ns 单位转为
+  与 `perf_counter` 一致的 QPC 秒数。补丁针对锁定的 ok-script 2.0.6，升级时复核截图生命周期；
+  其它截图方式使用截图耗时的中点估计，无法保证相同的时序精度。
+- 停用、暂停、失焦、退出、截图中断和异常均清理持键；清理直接调用交互层，避免框架
+  `check_enabled()` 在停用后阻止 key-up。看门线程只负责终止输入，不截图也不按新键。
+- `tests/test_auto_rhythm_task.py` 覆盖真实截图、多分辨率、三色短音符、连续同色、遮挡、
+  粘连长条、处理延迟与输入清理；`test_capture_timestamp_patch.py` 验证 WGC 时间戳保留。
+  `tests/fixtures/rhythm/` 只保留识别区域，其余画面置黑。
 
 ## 宝箱开锁：颜色带检测与开锁任务
 
@@ -404,3 +426,4 @@ uv run python main_debug.py    # Debug（更多日志、overlay、热重载）
 
 - 新增任务类必须注册进 `src/config.py`，否则 UI 中不可见。
 - 任务/配置相关文档与代码同步更新。
+
