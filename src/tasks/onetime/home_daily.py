@@ -26,15 +26,30 @@ class HomeDaily(BaseGameTask):
             expect=TemplateDetector(FeatureList.home_claim_cross),
             max_attempts=3
         )
-        self.wait_action_result(
-            condition=TemplateDetector(FeatureList.home_claim_cross),
-            action=lambda hit: self.click(hit),
-            expect=TemplateDetector(FeatureList.home_building_check),
-            while_condition=TemplateDetector(FeatureList.home_levelup_popup),
-            repeat_action=lambda: self.click(self.box_of_screen(0.4818, 0.6907, 0.5198, 0.7269)),
-            max_attempts=3
-        )
-        
+
+        stable_frame = 0
+        start_time = time.monotonic()
+        while time.monotonic() - start_time < 10:
+            self.next_frame()
+
+            if self.find_one(FeatureList.home_building_check):
+                stable_frame += 1
+                if stable_frame >= 5:
+                    return
+                self.sleep(0.1)
+                continue
+            stable_frame = 0
+
+            if box := self.find_one(FeatureList.home_claim_cross):
+                self.click(box)
+                self.sleep(0.1)
+                continue
+
+            if self.find_one(FeatureList.home_levelup_popup):
+                self.click(self.box_of_screen(0.4818, 0.6907, 0.5198, 0.7269))
+                self.sleep(0.1)
+                continue
+        raise WaitFailedException('Claim task of HomeDaily timeout.')
 
     def make_food(self):
         self.ui_ensure(page_home_building_pot)
