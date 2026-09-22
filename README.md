@@ -4,6 +4,8 @@
 
   <h1>ok-ap</h1>
 
+  <p>QQ群 1121173471</p>
+
   <p>
     面向《蓝色星原：旅谣》（Azur Promilia）的图像识别游戏自动化工具，基于 <a href="https://ok-script.com/">ok-script</a> 开发。
     <br />
