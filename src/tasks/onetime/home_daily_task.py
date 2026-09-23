@@ -12,7 +12,7 @@ from src.core.detector.ocr_detector import OcrDetector
 from src.icons import Icons
 
 
-class HomeDaily(BaseGameTask):
+class HomeDailyTask(BaseGameTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = "家园每日"
