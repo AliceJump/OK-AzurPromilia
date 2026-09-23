@@ -12,7 +12,7 @@ class TestAccountScopeStore(unittest.TestCase):
     def setUp(self):
         self._tmpdir = tempfile.mkdtemp()
         self._store_path = str(Path(self._tmpdir) / "account_scoped_overrides.json")
-        self._patcher = mock.patch.object(store, "_STORE_PATH", self._store_path)
+        self._patcher = mock.patch.object(store, "get_store_path", return_value=self._store_path)
         self._patcher.start()
 
     def tearDown(self):

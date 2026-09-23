@@ -6,9 +6,10 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
-from ok.util.file import ensure_dir_for_file, get_relative_path
+from ok.util.file import ensure_dir_for_file
 
-_STORE_PATH = get_relative_path("configs", "account_scoped_overrides.json")
+from src.core.paths import config_path
+
 _LOCK = threading.Lock()
 _CACHE_MTIME = object()
 _EMPTY_STORE: dict[str, Any] = {
@@ -20,7 +21,8 @@ _CACHE_DATA: dict[str, Any] = copy.deepcopy(_EMPTY_STORE)
 
 
 def get_store_path() -> str:
-    return _STORE_PATH
+    """账号覆盖存储文件路径；目录名取 config_folder，避免写死 configs。"""
+    return config_path("account_scoped_overrides.json")
 
 
 def _new_store() -> dict[str, Any]:
@@ -28,18 +30,18 @@ def _new_store() -> dict[str, Any]:
 
 
 def _backup_corrupt_store() -> str:
-    backup_path = f"{_STORE_PATH}.corrupt"
+    backup_path = f"{get_store_path()}.corrupt"
     try:
-        os.replace(_STORE_PATH, backup_path)
+        os.replace(get_store_path(), backup_path)
         return backup_path
     except OSError:
-        return f"{_STORE_PATH}（备份失败：{backup_path} 无法写入）"
+        return f"{get_store_path()}（备份失败：{backup_path} 无法写入）"
 
 
 def _load_store_json() -> tuple[dict[str, Any], Any]:
-    current_mtime: Any = os.path.getmtime(_STORE_PATH)
+    current_mtime: Any = os.path.getmtime(get_store_path())
     try:
-        with open(_STORE_PATH, encoding="utf-8") as fp:
+        with open(get_store_path(), encoding="utf-8") as fp:
             raw = fp.read()
     except OSError:
         raise
@@ -55,14 +57,14 @@ def _load_store_json() -> tuple[dict[str, Any], Any]:
 
 
 def _atomic_write_json(data: dict[str, Any]) -> Any:
-    ensure_dir_for_file(_STORE_PATH)
-    tmp_path = f"{_STORE_PATH}.tmp"
+    ensure_dir_for_file(get_store_path())
+    tmp_path = f"{get_store_path()}.tmp"
     with open(tmp_path, "w", encoding="utf-8") as fp:
         json.dump(data, fp, ensure_ascii=False, indent=2)
         fp.flush()
         os.fsync(fp.fileno())
-    os.replace(tmp_path, _STORE_PATH)
-    return os.path.getmtime(_STORE_PATH)
+    os.replace(tmp_path, get_store_path())
+    return os.path.getmtime(get_store_path())
 
 
 def _clean_text(value: Any) -> str:
@@ -320,8 +322,8 @@ def load_overrides(force: bool = False) -> dict[str, Any]:
     global _CACHE_DATA
 
     with _LOCK:
-        if os.path.exists(_STORE_PATH):
-            current_mtime: Any = os.path.getmtime(_STORE_PATH)
+        if os.path.exists(get_store_path()):
+            current_mtime: Any = os.path.getmtime(get_store_path())
         else:
             current_mtime = None
 
@@ -357,7 +359,7 @@ def update_overrides(updater: Callable[[dict[str, Any]], dict[str, Any]]) -> dic
     global _CACHE_DATA
 
     with _LOCK:
-        if os.path.exists(_STORE_PATH):
+        if os.path.exists(get_store_path()):
             current, current_mtime = _load_store_json()
             current = _normalize(current)
         else:

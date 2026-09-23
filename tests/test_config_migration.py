@@ -20,8 +20,8 @@ class TestConfigMigration(unittest.TestCase):
         migrations = {"旧键": "新键"}
 
         with mock.patch(
-            "src.core.config_migration.get_relative_path",
-            side_effect=lambda *parts: str(Path(configs_dir, *parts)),
+            "src.core.config_migration.config_path",
+            side_effect=lambda *parts: str(Path(configs_dir, "configs", *parts)),
         ):
             migrate_config_file_keys("TestTask", migrations)
 
