@@ -315,6 +315,45 @@
     },
     {
       "id": 24,
+      "image_id": 1,
+      "category_id": 27,
+      "bbox": [
+        679,
+        1034,
+        12,
+        13
+      ],
+      "area": 156,
+      "iscrowd": 0
+    },
+    {
+      "id": 25,
+      "image_id": 1,
+      "category_id": 29,
+      "bbox": [
+        953,
+        934,
+        32,
+        59
+      ],
+      "area": 1888,
+      "iscrowd": 0
+    },
+    {
+      "id": 26,
+      "image_id": 1,
+      "category_id": 30,
+      "bbox": [
+        1325,
+        932,
+        34,
+        64
+      ],
+      "area": 2176,
+      "iscrowd": 0
+    },
+    {
+      "id": 27,
       "image_id": 2,
       "category_id": 12,
       "bbox": [
@@ -327,7 +366,7 @@
       "iscrowd": 0
     },
     {
-      "id": 25,
+      "id": 28,
       "image_id": 2,
       "category_id": 22,
       "bbox": [
@@ -337,6 +376,19 @@
         29
       ],
       "area": 783,
+      "iscrowd": 0
+    },
+    {
+      "id": 29,
+      "image_id": 2,
+      "category_id": 28,
+      "bbox": [
+        580,
+        935,
+        32,
+        60
+      ],
+      "area": 1920,
       "iscrowd": 0
     }
   ],
@@ -458,6 +510,26 @@
     {
       "id": 26,
       "name": "home_ranch_claim",
+      "supercategory": ""
+    },
+    {
+      "id": 27,
+      "name": "commission_check",
+      "supercategory": ""
+    },
+    {
+      "id": 28,
+      "name": "commission_daily_material_check",
+      "supercategory": ""
+    },
+    {
+      "id": 29,
+      "name": "commission_daily_boss_check",
+      "supercategory": ""
+    },
+    {
+      "id": 30,
+      "name": "commission_daily_equipment_check",
       "supercategory": ""
     }
   ]

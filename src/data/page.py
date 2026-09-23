@@ -247,4 +247,23 @@ page_home_building.link(_find_with_scroll_then_click(FeatureList.home_building_p
 page_home_restaurant = Page(FeatureList.home_restaurant_check, check_kwargs={'mask_function': make_hsv_isolator(HSVRange.WHITE, invert=False)})
 page_home.link(_click_box(0.0932, 0.6593, 0.1594, 0.6954), page_home_restaurant, back_button=_send_key('esc'))
 
+# commission
+page_commission = Page(FeatureList.commission_check)
+page_main.link(_send_key('f4'), page_commission)
+page_commission.link(_click_home(), page_main)
+
+# commission_daily
+page_commission_daily_material = Page(FeatureList.commission_daily_material_check).link(_send_key('esc'), page_commission)
+page_commission_daily_boss = Page(FeatureList.commission_daily_boss_check).link(_send_key('esc'), page_commission)
+page_commission_daily_equipment = Page(FeatureList.commission_daily_equipment_check).link(_send_key('esc'), page_commission)
+page_commission.link(_click_box(0.6635, 0.6713, 0.7042, 0.7074), page_commission_daily_material)
+page_commission_daily_boss.link(_click_box(0.3000, 0.9398, 0.3208, 0.9565), page_commission_daily_material)
+page_commission_daily_equipment.link(_click_box(0.3000, 0.9398, 0.3208, 0.9565), page_commission_daily_material)
+page_commission_daily_material.link(_click_box(0.4932, 0.9361, 0.5146, 0.9602), page_commission_daily_boss)
+page_commission_daily_equipment.link(_click_box(0.4932, 0.9361, 0.5146, 0.9602), page_commission_daily_boss)
+page_commission_daily_material.link(_click_box(0.6885, 0.9389, 0.7089, 0.9593), page_commission_daily_equipment)
+page_commission_daily_boss.link(_click_box(0.6885, 0.9389, 0.7089, 0.9593), page_commission_daily_equipment)
+
+
+
 Page.build()
