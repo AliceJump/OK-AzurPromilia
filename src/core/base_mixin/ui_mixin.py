@@ -5,7 +5,7 @@ from typing import Any
 
 from ok import Logger, WaitFailedException
 
-from src.data.page import Page
+from src.data.page import Page, PageNotFoundError
 
 logger = Logger.get_logger(__name__)
 
@@ -25,6 +25,7 @@ class UIMixin:
         destination: Page | str,
         time_out: float = 30.0,
         interval: float | None = None,
+        page_not_found_tolerance: float = 3.0,
     ) -> bool:
         """通过 BFS 路由拓扑导航前往目标页面。
 
@@ -32,12 +33,15 @@ class UIMixin:
             destination: 目标页面实例或页面名称。
             time_out: 最大导航超时时间（秒）。
             interval: 页面切换动作后的防抖等待时间（秒）。默认读取 self.once_sleep_time 或 1.0。
+            page_not_found_tolerance: 连续无法识别当前所在页面的最大容忍时间（秒）。
+                超过此时间仍未能匹配任何已注册页面时抛出 PageNotFoundError。
 
         Returns:
             bool: 是否成功到达目标页面。
 
         Raises:
             WaitFailedException: 导航超时或目标页面未到达。
+            PageNotFoundError: 连续未识别当前页面超过 page_not_found_tolerance 秒。
             KeyError: 目标页面未在 Page 注册表中。
         """
         dest_page = Page.get(destination)
@@ -48,6 +52,7 @@ class UIMixin:
 
         logger.info(f"UI goto destination: {dest_page}")
         start_time = time.monotonic()
+        page_not_found_time = None
 
         try:
             while True:
@@ -80,6 +85,7 @@ class UIMixin:
                         break
 
                 if current_page is not None:
+                    page_not_found_time = None
                     next_page = current_page.parent
                     if next_page is not None:
                         button = current_page.links.get(next_page)
@@ -87,6 +93,12 @@ class UIMixin:
                         self._ui_execute_action(button)
                         if interval > 0:
                             self.sleep(interval)
+                else:
+                    if page_not_found_time is None:
+                        page_not_found_time = time.monotonic()
+                    elif time.monotonic() - page_not_found_time > page_not_found_tolerance:
+                        raise PageNotFoundError('Unknown page.')
+                    time.sleep(0.1)
 
                 # 超时检测
                 if time.monotonic() - start_time > time_out:

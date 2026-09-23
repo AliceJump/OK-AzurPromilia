@@ -8,6 +8,9 @@ from src.data.feature_list import FeatureList
 from src.image.hsv_config import HSVRange
 from src.image.frame_processes import make_hsv_isolator
 
+class PageNotFoundError(Exception):
+    """当前画面持续未匹配到任何已注册的 Page 拓扑节点时抛出。"""
+    pass
 
 class Page:
     """页面定义与寻路拓扑节点。

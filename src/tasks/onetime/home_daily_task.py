@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import time
-
 from ok import WaitFailedException
 
 from src.core.base_game_task import BaseGameTask
@@ -28,8 +26,8 @@ class HomeDailyTask(BaseGameTask):
         )
 
         stable_frame = 0
-        start_time = time.monotonic()
-        while time.monotonic() - start_time < 10:
+        start_time = self.active_time()
+        while self.active_time() - start_time < 10:
             self.next_frame()
 
             if self.find_one(FeatureList.home_building_check):
@@ -75,8 +73,8 @@ class HomeDailyTask(BaseGameTask):
 
     def feed(self):
         self.ui_ensure(page_home_restaurant)
-        start_time = time.monotonic()
-        while time.monotonic() - start_time < 10:
+        start_time = self.active_time()
+        while self.active_time() - start_time < 10:
             self.next_frame()
             boxes = self.ocr(box=self.box_of_screen(0.4557, 0.2389, 0.5427, 0.2611))
             if not boxes or not (result := boxes[0].name):
