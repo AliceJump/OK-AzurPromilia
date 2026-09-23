@@ -226,7 +226,7 @@ page_menu = Page(FeatureList.menu_backpack, check_kwargs={'mask_function': make_
 page_main.link(_send_key('esc'), page_menu, back_button=_send_key('esc'))
 
 # home
-page_home = Page(FeatureList.home_kibi_manage, check_kwargs={'use_gray_scale': True})
+page_home = Page(FeatureList.home_kibo_manage, check_kwargs={'use_gray_scale': True})
 page_menu.link(_click_box(0.2276, 0.9111, 0.2401, 0.9333), page_home, back_button=_send_key('esc'))
 page_home.link(_click_home(), page_main)
 

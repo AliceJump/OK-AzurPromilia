@@ -3,7 +3,7 @@ from __future__ import annotations
 from ok import WaitFailedException
 
 from src.core.base_game_task import BaseGameTask
-from src.data.page import page_main, page_home_building, page_home_building_pot, page_home_restaurant
+from src.data.page import page_main, page_home, page_home_building, page_home_building_pot, page_home_restaurant
 from src.data.feature_list import FeatureList
 from src.core.detector.template_detector import TemplateDetector
 from src.core.detector.ocr_detector import OcrDetector
@@ -17,20 +17,13 @@ class HomeDailyTask(BaseGameTask):
         self.icon = Icons.Task
         self.description = "完成家园每日任务"
 
-    def claim(self):
-        self.ui_ensure(page_home_building)
-        self.wait_action_result(
-            action=lambda: self.click(self.box_of_screen(0.0333, 0.8093, 0.0656, 0.8676)),
-            expect=TemplateDetector(FeatureList.home_claim_cross),
-            max_attempts=3
-        )
-
+    def _handle_claim_popup(self, checker):
         stable_frame = 0
         start_time = self.active_time()
         while self.active_time() - start_time < 10:
             self.next_frame()
 
-            if self.find_one(FeatureList.home_building_check):
+            if self.find_one(checker):
                 stable_frame += 1
                 if stable_frame >= 5:
                     return
@@ -48,6 +41,25 @@ class HomeDailyTask(BaseGameTask):
                 self.sleep(0.1)
                 continue
         raise WaitFailedException('Claim task of HomeDaily timeout.')
+
+    def claim(self):
+        self.ui_ensure(page_home)
+        if self.wait_action_result(
+            condition=TemplateDetector(FeatureList.home_ranch_claim),
+            action=lambda box: self.click(box),
+            expect=TemplateDetector(FeatureList.home_claim_cross),
+            max_attempts=3,
+            time_out=2,
+        ):
+            self._handle_claim_popup(FeatureList.home_kibo_manage)
+
+        self.ui_ensure(page_home_building)
+        self.wait_action_result(
+            action=lambda: self.click(self.box_of_screen(0.0333, 0.8093, 0.0656, 0.8676)),
+            expect=TemplateDetector(FeatureList.home_claim_cross),
+            max_attempts=3
+        )
+        self._handle_claim_popup(FeatureList.home_building_check)
 
     def make_food(self):
         self.ui_ensure(page_home_building_pot)

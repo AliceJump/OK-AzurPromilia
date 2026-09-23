@@ -186,6 +186,19 @@
     {
       "id": 14,
       "image_id": 1,
+      "category_id": 26,
+      "bbox": [
+        580,
+        983,
+        15,
+        14
+      ],
+      "area": 210,
+      "iscrowd": 0
+    },
+    {
+      "id": 15,
+      "image_id": 1,
       "category_id": 16,
       "bbox": [
         156,
@@ -197,7 +210,7 @@
       "iscrowd": 0
     },
     {
-      "id": 15,
+      "id": 16,
       "image_id": 1,
       "category_id": 18,
       "bbox": [
@@ -210,7 +223,7 @@
       "iscrowd": 0
     },
     {
-      "id": 16,
+      "id": 17,
       "image_id": 1,
       "category_id": 21,
       "bbox": [
@@ -223,7 +236,7 @@
       "iscrowd": 0
     },
     {
-      "id": 17,
+      "id": 18,
       "image_id": 1,
       "category_id": 17,
       "bbox": [
@@ -236,7 +249,7 @@
       "iscrowd": 0
     },
     {
-      "id": 18,
+      "id": 19,
       "image_id": 1,
       "category_id": 19,
       "bbox": [
@@ -249,7 +262,7 @@
       "iscrowd": 0
     },
     {
-      "id": 19,
+      "id": 20,
       "image_id": 1,
       "category_id": 20,
       "bbox": [
@@ -262,7 +275,7 @@
       "iscrowd": 0
     },
     {
-      "id": 20,
+      "id": 21,
       "image_id": 1,
       "category_id": 23,
       "bbox": [
@@ -275,7 +288,7 @@
       "iscrowd": 0
     },
     {
-      "id": 21,
+      "id": 22,
       "image_id": 1,
       "category_id": 24,
       "bbox": [
@@ -288,7 +301,7 @@
       "iscrowd": 0
     },
     {
-      "id": 22,
+      "id": 23,
       "image_id": 1,
       "category_id": 25,
       "bbox": [
@@ -301,7 +314,7 @@
       "iscrowd": 0
     },
     {
-      "id": 23,
+      "id": 24,
       "image_id": 2,
       "category_id": 12,
       "bbox": [
@@ -314,7 +327,7 @@
       "iscrowd": 0
     },
     {
-      "id": 24,
+      "id": 25,
       "image_id": 2,
       "category_id": 22,
       "bbox": [
@@ -389,7 +402,7 @@
     },
     {
       "id": 15,
-      "name": "home_kibi_manage",
+      "name": "home_kibo_manage",
       "supercategory": ""
     },
     {
@@ -440,6 +453,11 @@
     {
       "id": 25,
       "name": "home_levelup_popup",
+      "supercategory": ""
+    },
+    {
+      "id": 26,
+      "name": "home_ranch_claim",
       "supercategory": ""
     }
   ]
