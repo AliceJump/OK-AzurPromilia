@@ -208,7 +208,10 @@ class AccountConfigTab(CustomTab):
         seen = set()
         for task in list(getattr(self.executor, "onetime_tasks", [])) + list(getattr(self.executor, "trigger_tasks", [])):
             if not getattr(task, "support_multi_account", False):
-                continue
+                # 声明了子任务参数的任务也纳入：家园每日等子任务的参数
+                # 平时只存在子任务自己的配置文件里，按账号覆盖时在账号配置页编辑
+                if not getattr(task, "sub_task_default_config", None):
+                    continue
             class_name = task.__class__.__name__
             if class_name in seen:
                 continue

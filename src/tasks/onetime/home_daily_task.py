@@ -1,23 +1,69 @@
-from __future__ import annotations
-
-import time
+from src.core.account_override_mixin import AccountOverrideMixin
+from src.core.base_game_task import BaseGameTask
+from src.data.page import page_main, page_home_building, page_home_building_pot, page_home_restaurant
+from src.core.detector.template_detector import TemplateDetector
+from src.core.detector.ocr_detector import OcrDetector
+from src.data.feature_list import FeatureList
+from src.icons import Icons
 
 from ok import WaitFailedException
 
-from src.core.base_game_task import BaseGameTask
-from src.data.page import page_main, page_home_building, page_home_building_pot, page_home_restaurant
-from src.data.feature_list import FeatureList
-from src.core.detector.template_detector import TemplateDetector
-from src.core.detector.ocr_detector import OcrDetector
-from src.icons import Icons
-
 
 class HomeDailyTask(BaseGameTask):
+    """家园每日任务：收菜 → 做饭 → 喂饭 → 回主界面。
+
+    独立运行；也可由 ``DailyFeature`` 包装后接入一键日常（日常不继承本类）。
+    """
+
+    # ── 子任务参数（供 DailyFeature 接入日常时复用） ──
+    # 账号覆盖存储挂的任务名；参数配置文件即 configs/<sub_task_config_name>.json，
+    # 由框架加载进本实例的 self.config。
+    sub_task_config_name = "HomeDailyTask"
+    # 参数声明：{配置键: 默认值}。声明后：
+    #   1. 本任务面板可编辑（_init_home_daily_config 注册）
+    #   2. 被日常执行时经 _sub_task_cfg 读取（多账号覆盖 → 自身配置 → 默认值）
+    #   3. 「账号配置」页可按账号覆盖（account_config_tab 收集声明了参数的子任务）
+    # 目前暂无参数；未来加参数时在这里填，例如 {"喂饭阈值": 100}。
+    sub_task_default_config: dict = {}
+    # 与 sub_task_default_config 同键的说明文案
+    sub_task_config_description: dict = {}
+    # 运行时由 DailyFeature 注入：宿主的账号覆盖查询 fn(config_name) -> dict。
+    # 独立运行时为 None，参数直接读自身配置。
+    _account_override_provider = None
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = "家园每日"
         self.icon = Icons.Task
         self.description = "完成家园每日任务"
+        # 注册子任务参数声明
+        self._init_home_daily_config()
+
+    def _init_home_daily_config(self):
+        """把参数声明注册进本任务的 default_config / config_description。"""
+        self.default_config.update(self.sub_task_default_config)
+        self.config_description.update(self.sub_task_config_description)
+
+    def _sub_task_cfg(self, key, default=None):
+        """子任务参数取值。业务代码读参数一律走本方法，不要直接 self.config。
+
+        解析顺序：
+        1. 多账号覆盖：由 DailyFeature 注入的宿主查询（内部已判断
+           任务运行中、多账户独立配置开启、已设置当前账号），命中时
+           以自身配置值为基准做类型校正；
+        2. 自身配置（框架已加载 configs/<任务名>.json），缺键回落默认值。
+        """
+        declared_default = self.sub_task_default_config.get(key, default)
+        provider = self._account_override_provider
+        if provider is not None:
+            try:
+                overrides = provider(self.sub_task_config_name) or {}
+            except Exception:
+                overrides = {}
+            if key in overrides:
+                base = self.config.get(key, declared_default)
+                return AccountOverrideMixin._coerce_override_value(base, overrides.get(key))
+        return self.config.get(key, declared_default)
 
     def claim(self):
         self.ui_ensure(page_home_building)
@@ -28,8 +74,8 @@ class HomeDailyTask(BaseGameTask):
         )
 
         stable_frame = 0
-        start_time = time.monotonic()
-        while time.monotonic() - start_time < 10:
+        start_time = self.active_time()
+        while self.active_time() - start_time < 10:
             self.next_frame()
 
             if self.find_one(FeatureList.home_building_check):
@@ -75,8 +121,8 @@ class HomeDailyTask(BaseGameTask):
 
     def feed(self):
         self.ui_ensure(page_home_restaurant)
-        start_time = time.monotonic()
-        while time.monotonic() - start_time < 10:
+        start_time = self.active_time()
+        while self.active_time() - start_time < 10:
             self.next_frame()
             boxes = self.ocr(box=self.box_of_screen(0.4557, 0.2389, 0.5427, 0.2611))
             if not boxes or not (result := boxes[0].name):
@@ -95,7 +141,8 @@ class HomeDailyTask(BaseGameTask):
             self.sleep(0.2)
         raise WaitFailedException('Feed task of HomeDaily timeout.')
 
-    def run(self):
+    def run_home_daily(self):
+        """家园每日完整流程，独立运行与被日常执行共用。"""
         # 收菜
         self.claim()
 
@@ -107,3 +154,6 @@ class HomeDailyTask(BaseGameTask):
 
         # 回主页面
         self.ui_ensure(page_main)
+
+    def run(self):
+        self.run_home_daily()
