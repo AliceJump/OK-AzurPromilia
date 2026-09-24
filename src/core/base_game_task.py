@@ -413,6 +413,7 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
         max_scrolls=5,
         delay=0.2,
     ):
+        detector = self._resolve_detector(detector)
         frame = self.next_frame()
 
         if result := detector.detect(frame):
@@ -423,7 +424,7 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
         last_hash = None
         for _ in range(max_scrolls):
             self.scroll(scroll_x, scroll_y, scroll_count)
-            time.sleep(delay)
+            self.sleep(delay)
             frame = self.next_frame()
 
             if result := detector.detect(frame):
@@ -445,13 +446,14 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
         delay=0.2,
         max_attempts=3,
     ):
+        detector = self._resolve_detector(detector)
         for _ in range(max_attempts):
             try:
                 return self._detect_with_scroll(detector, box, scroll_count, max_scrolls, delay)
             except CannotFindException:
                 scroll_x, scroll_y = box.center()
                 self.scroll(scroll_x, scroll_y, -scroll_count * max_scrolls)
-                time.sleep(delay)
+                self.sleep(delay)
 
         raise CannotFindException('Cannot find with scroll.')
 

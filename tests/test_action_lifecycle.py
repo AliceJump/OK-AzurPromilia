@@ -55,6 +55,11 @@ class FakeTask(RuntimeMixin):
     # ── 框架交互 stub ──
 
     loop = BaseGameTask.loop
+    detect_with_scroll = BaseGameTask.detect_with_scroll
+    _detect_with_scroll = BaseGameTask._detect_with_scroll
+
+    def scroll(self, x, y, count):
+        self.calls.append(("scroll", (x, y, count)))
 
     def next_frame(self):
         if not self.frames:
@@ -823,6 +828,68 @@ class TestDetectorResolution(unittest.TestCase):
                 return None
 
         self.assertIsInstance(self.task._resolve_detector(Custom()), Custom)
+
+    def test_unattached_detectors_raise_runtime_error(self):
+        """未 attach 时直接 detect 应报明确的 RuntimeError 而非 AttributeError。"""
+        dummy_frame = object()
+        with self.assertRaises(RuntimeError) as ctx:
+            OcrDetector("test").detect(dummy_frame)
+        self.assertIn("未绑定任务宿主", str(ctx.exception))
+
+        with self.assertRaises(RuntimeError) as ctx:
+            TemplateDetector("feat").detect(dummy_frame)
+        self.assertIn("未绑定任务宿主", str(ctx.exception))
+
+        with self.assertRaises(RuntimeError) as ctx:
+            YoloDetector("target").detect(dummy_frame)
+        self.assertIn("未绑定任务宿主", str(ctx.exception))
+
+        with self.assertRaises(RuntimeError) as ctx:
+            ButtonDetectorAdapter(box=Box(0, 0, 10, 10)).detect(dummy_frame)
+        self.assertIn("未绑定任务宿主", str(ctx.exception))
+
+    def test_inverted_detector_attaches_inner(self):
+        """InvertedDetector 应能递归 attach 内部判据。"""
+        inner = TemplateDetector("f")
+        inv = InvertedDetector(inner, box=Box(1, 1, 10, 10))
+        self.task._resolve_detector(inv)
+        self.assertIs(inner._task, self.task)
+
+    def test_detect_with_scroll_auto_attaches_ocr_detector(self):
+        """detect_with_scroll 必须自动调用 _resolve_detector 绑定宿主。"""
+        self.task.frames = [object()]
+        self.task.ocr_result = [Box(10, 20, 30, 40, confidence=0.9, name="委托")]
+
+        detector = OcrDetector("委托")
+        self.assertIsNone(detector._task)
+
+        hit = self.task.detect_with_scroll(
+            detector=detector,
+            box=Box(0, 0, 100, 100),
+            scroll_count=3,
+        )
+        self.assertIsNotNone(hit)
+        self.assertIs(detector._task, self.task)
+        self.assertEqual(hit.box.x, 10)
+        self.assertEqual(hit.box.y, 20)
+
+    def test_detect_with_scroll_auto_attaches_template_detector(self):
+        """detect_with_scroll 传入 TemplateDetector 同样应自动绑定宿主。"""
+        self.task.frames = [object()]
+        self.task.find_feature_result = Box(15, 25, 30, 40, confidence=0.85)
+
+        detector = TemplateDetector("icon")
+        self.assertIsNone(detector._task)
+
+        hit = self.task.detect_with_scroll(
+            detector=detector,
+            box=Box(0, 0, 100, 100),
+            scroll_count=-3,
+        )
+        self.assertIsNotNone(hit)
+        self.assertIs(detector._task, self.task)
+        self.assertEqual(hit.box.x, 15)
+        self.assertEqual(hit.box.y, 25)
 
 
 if __name__ == "__main__":

@@ -116,6 +116,18 @@ class InvertedDetector:
     def name(self) -> str:
         return self._name
 
+    @property
+    def detectors(self) -> list:
+        """内部判据序列（供宿主任务递归 attach）。"""
+        return [self._detector]
+
+    def attach(self, task) -> "InvertedDetector":
+        """绑定宿主任务（透传给内部判据）。"""
+        attach = getattr(self._detector, "attach", None)
+        if callable(attach):
+            attach(task)
+        return self
+
     def detect(self, frame) -> Hit | None:
         if self._detector.detect(frame):
             return None

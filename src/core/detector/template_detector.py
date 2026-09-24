@@ -69,12 +69,18 @@ class TemplateDetector:
         self._canny_higher = canny_higher
         self._name = name or str(getattr(feature, "value", feature))
         self._use_find_one = use_find_one
+        self._task = None
 
     @property
     def name(self) -> str:
         return self._name
 
     def detect(self, frame) -> Hit | None:
+        if self._task is None:
+            raise RuntimeError(
+                f"{self.__class__.__name__} 未绑定任务宿主，"
+                "请先调用 attach(task) 或通过任务辅助方法（如 wait_action_result / detect_with_scroll）调用"
+            )
         # task 由 RuntimeMixin 在调用前注入（见 attach）
         if self._use_find_one:
             result = self._task.find_one(

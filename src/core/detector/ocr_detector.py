@@ -70,6 +70,7 @@ class OcrDetector:
         self._target_height = target_height
         self._pick = pick
         self._name = name or self._match_label(match)
+        self._task = None
 
     @staticmethod
     def _match_label(match) -> str:
@@ -82,6 +83,11 @@ class OcrDetector:
         return self._name
 
     def detect(self, frame) -> Hit | None:
+        if self._task is None:
+            raise RuntimeError(
+                f"{self.__class__.__name__} 未绑定任务宿主，"
+                "请先调用 attach(task) 或通过任务辅助方法（如 wait_action_result / detect_with_scroll）调用"
+            )
         boxes = self._task.ocr(
             box=self._box,
             match=self._match,
@@ -124,6 +130,10 @@ class OcrDetector:
             return self._box.x + self._box.width / 2.0, self._box.y + self._box.height / 2.0
         width = getattr(self._task, "width", 0) or 0
         height = getattr(self._task, "height", 0) or 0
+        if callable(width):
+            width = width()
+        if callable(height):
+            height = height()
         if width and height:
             return (
                 (self._region["x"] + self._region["to_x"]) / 2.0 * width,

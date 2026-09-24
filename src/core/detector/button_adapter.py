@@ -41,12 +41,18 @@ class ButtonDetectorAdapter:
         self._backdrop_hsv = backdrop_hsv
         self._require_backdrop = require_backdrop
         self._name = name
+        self._task = None
 
     @property
     def name(self) -> str:
         return self._name
 
     def detect(self, frame) -> Hit | None:
+        if self._task is None:
+            raise RuntimeError(
+                f"{self.__class__.__name__} 未绑定任务宿主，"
+                "请先调用 attach(task) 或通过任务辅助方法（如 wait_action_result / detect_with_scroll）调用"
+            )
         result = self._task.find_button(
             self._box,
             frame=frame,

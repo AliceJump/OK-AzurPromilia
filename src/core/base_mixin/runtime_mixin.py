@@ -1052,11 +1052,13 @@ class RuntimeMixin:
         if callable(attach) and getattr(detector, "_task", None) is None:
             attach(self)
 
-        # 组合器：递归绑定内部判据
+        # 组合器与包装器：递归绑定内部判据
         inner = getattr(detector, "detectors", None)
         if inner:
             for item in inner:
                 self._resolve_detector(item)
+        elif hasattr(detector, "_detector"):
+            self._resolve_detector(getattr(detector, "_detector"))
 
         if not hasattr(detector, "detect"):
             raise TypeError(

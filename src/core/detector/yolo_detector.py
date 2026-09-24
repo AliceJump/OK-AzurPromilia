@@ -54,12 +54,18 @@ class YoloDetector:
         self._pick = pick
         names = [name] if isinstance(name, str) else list(name)
         self._label = task_name or "_".join(str(n) for n in names)
+        self._task = None
 
     @property
     def name(self) -> str:
         return self._label
 
     def detect(self, frame) -> Hit | None:
+        if self._task is None:
+            raise RuntimeError(
+                f"{self.__class__.__name__} 未绑定任务宿主，"
+                "请先调用 attach(task) 或通过任务辅助方法（如 wait_action_result / detect_with_scroll）调用"
+            )
         boxes = self._task.yolo_detect(
             name=self._name,
             frame=frame,
@@ -95,6 +101,10 @@ class YoloDetector:
         if self._box is None:
             width = getattr(self._task, "width", 0) or 0
             height = getattr(self._task, "height", 0) or 0
+            if callable(width):
+                width = width()
+            if callable(height):
+                height = height()
             return width / 2.0, height / 2.0
         return self._box.x + self._box.width / 2.0, self._box.y + self._box.height / 2.0
 
