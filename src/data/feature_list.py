@@ -3,8 +3,13 @@ from enum import Enum
 
 class FeatureList(str, Enum):
     account_switch = 'account_switch'
+    auto_combat_check = 'auto_combat_check'
+    auto_combat_setting = 'auto_combat_setting'
+    bond_levelup_popup = 'bond_levelup_popup'
     char_button = 'char_button'
     close_button = 'close_button'
+    combat_button_return = 'combat_button_return'
+    commission_button_start_commission = 'commission_button_start_commission'
     commission_check = 'commission_check'
     commission_daily_boss_check = 'commission_daily_boss_check'
     commission_daily_equipment_check = 'commission_daily_equipment_check'
@@ -21,6 +26,7 @@ class FeatureList(str, Enum):
     home_levelup_popup = 'home_levelup_popup'
     home_ranch_claim = 'home_ranch_claim'
     home_restaurant_check = 'home_restaurant_check'
+    loading_check = 'loading_check'
     login_in = 'login_in'
     login_out = 'login_out'
     menu_backpack = 'menu_backpack'

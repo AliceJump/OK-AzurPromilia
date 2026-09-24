@@ -254,9 +254,9 @@ page_main.link(_send_key('f4'), page_commission)
 page_commission.link(_click_home(), page_main)
 
 # commission_daily
-page_commission_daily_material = Page(FeatureList.commission_daily_material_check).link(_send_key('esc'), page_commission)
-page_commission_daily_boss = Page(FeatureList.commission_daily_boss_check).link(_send_key('esc'), page_commission)
-page_commission_daily_equipment = Page(FeatureList.commission_daily_equipment_check).link(_send_key('esc'), page_commission)
+page_commission_daily_material = Page(FeatureList.commission_daily_material_check).link(_send_key('esc'), page_commission).link(_click_home(), page_main)
+page_commission_daily_boss = Page(FeatureList.commission_daily_boss_check).link(_send_key('esc'), page_commission).link(_click_home(), page_main)
+page_commission_daily_equipment = Page(FeatureList.commission_daily_equipment_check).link(_send_key('esc'), page_commission).link(_click_home(), page_main)
 page_commission.link(_click_box(0.6635, 0.6713, 0.7042, 0.7074), page_commission_daily_material)
 page_commission_daily_boss.link(_click_box(0.3000, 0.9398, 0.3208, 0.9565), page_commission_daily_material)
 page_commission_daily_equipment.link(_click_box(0.3000, 0.9398, 0.3208, 0.9565), page_commission_daily_material)
