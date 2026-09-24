@@ -110,7 +110,7 @@ class HomeDailyTask(BaseGameTask):
     def make_food(self):
         self.ui_ensure(page_home_building_pot)
         self.wait_action_result(
-            action=lambda: self.click(self.box_of_screen(0.4573, 0.1593, 0.4661, 0.1750)),
+            action=lambda: self.click(self.box_of_screen(0.3797, 0.1565, 0.3906, 0.1731)),
             expect=TemplateDetector(FeatureList.pot_category_all_activated),
             max_attempts=3
         )
@@ -123,7 +123,8 @@ class HomeDailyTask(BaseGameTask):
             ),
             max_attempts=3
         ):
-            raise RuntimeError('Failed to find food.')
+            self.log_warning('Failed to make food.')
+            return
 
         self.click(self.box_of_screen(0.8792, 0.7639, 0.8896, 0.7806))
         self.sleep(0.1)
