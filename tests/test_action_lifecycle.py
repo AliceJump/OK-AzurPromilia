@@ -27,6 +27,7 @@ from src.core.detector import (
     TemplateDetector,
     YoloDetector,
 )
+from src.core.base_game_task import BaseGameTask
 from src.core.base_mixin.framework_override_mixin import FrameworkOverrideMixin
 from src.core.base_mixin.runtime_mixin import RuntimeMixin
 
@@ -52,6 +53,8 @@ class FakeTask(RuntimeMixin):
         self.find_button_result = None
 
     # ── 框架交互 stub ──
+
+    loop = BaseGameTask.loop
 
     def next_frame(self):
         if not self.frames:

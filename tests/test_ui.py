@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 from ok import WaitFailedException
 
+from src.core.base_game_task import BaseGameTask
 from src.core.base_mixin.ui_mixin import UIMixin
 from src.data.page import Page
 
@@ -40,6 +41,8 @@ class MockTask(UIMixin):
 
     def click(self, button):
         self.clicks.append(button)
+
+    loop = BaseGameTask.loop
 
 
 class TestPage(unittest.TestCase):

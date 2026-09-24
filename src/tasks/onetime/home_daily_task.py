@@ -68,10 +68,7 @@ class HomeDailyTask(BaseGameTask):
 
     def _handle_claim_popup(self, checker):
         stable_frame = 0
-        start_time = self.active_time()
-        while self.active_time() - start_time < 10:
-            self.next_frame()
-
+        for _ in self.loop(10, raise_if_time_out=False):
             if self.find_one(checker):
                 stable_frame += 1
                 if stable_frame >= 5:
@@ -117,9 +114,9 @@ class HomeDailyTask(BaseGameTask):
             expect=TemplateDetector(FeatureList.pot_category_all_activated),
             max_attempts=3
         )
-        food_box = self.find_with_scroll(FeatureList.food_little_bobo, self.box_of_screen(0.2865, 0.2176, 0.6188, 0.8667))
+        food_hit = self.detect_with_scroll(TemplateDetector(FeatureList.food_little_bobo), self.box_of_screen(0.2865, 0.2176, 0.6188, 0.8667))
         if not self.wait_action_result(
-            action=lambda: self.click(food_box),
+            action=lambda: self.click(food_hit),
             expect=OcrDetector(
                 match=self.lang.home.little_bobo,
                 box=self.box_of_screen(0.6797, 0.1852, 0.7786, 0.2241)
@@ -134,10 +131,8 @@ class HomeDailyTask(BaseGameTask):
 
     def feed(self):
         self.ui_ensure(page_home_restaurant)
-        start_time = self.active_time()
-        while self.active_time() - start_time < 10:
-            self.next_frame()
-            boxes = self.ocr(box=self.box_of_screen(0.4557, 0.2389, 0.5427, 0.2611))
+        for frame in self.loop(10):
+            boxes = self.ocr(box=self.box_of_screen(0.4557, 0.2389, 0.5427, 0.2611), frame=frame)
             if not boxes or not (result := boxes[0].name):
                 continue
             if result.count('/') != 1:
@@ -152,7 +147,6 @@ class HomeDailyTask(BaseGameTask):
 
             self.click(self.box_of_screen(0.8375, 0.8667, 0.8630, 0.9157))
             self.sleep(0.2)
-        raise WaitFailedException('Feed task of HomeDaily timeout.')
 
     def run_home_daily(self):
         """家园每日完整流程，独立运行与被日常执行共用。"""

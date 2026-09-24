@@ -801,7 +801,6 @@ class RuntimeMixin:
 
             raise ValueError("box must be None / (x,y,w,h) / object(x,y,width,height)")
 
-        start_time = self.active_time()
         last_frame = parse_box(self.next_frame(), box)
         stable_start = None
         last_hash = None
@@ -810,8 +809,8 @@ class RuntimeMixin:
 
             last_hash = perceptual_hash(last_frame, method=method)
 
-        while True:
-            current_frame = parse_box(self.next_frame(), box)
+        for raw_frame in self.loop(max_wait, yield_frame=True, raise_if_time_out=False):
+            current_frame = parse_box(raw_frame, box)
 
             if method in ("phash", "dhash"):
                 h2 = perceptual_hash(current_frame, method=method)
@@ -844,11 +843,10 @@ class RuntimeMixin:
             else:
                 stable_start = None
 
-            if self.active_time() - start_time > max_wait:
-                return False
-
             last_frame = current_frame
             self.sleep(refresh_interval)
+
+        return False
 
     # ── 按键 / 移动 ────────────────────────────────────
 
@@ -1204,9 +1202,7 @@ class RuntimeMixin:
         # ── 阶段一：等待前置条件成立 ──
         hit = None
         if condition is not None:
-            start = self.active_time()
-            while self.active_time() - start <= time_out:
-                frame = self.next_frame()
+            for frame in self.loop(time_out, yield_frame=True, raise_if_time_out=False):
                 hit = condition.detect(frame)
                 if hit:
                     break
@@ -1269,13 +1265,11 @@ class RuntimeMixin:
         if while_condition is None or repeat_action is None:
             return None
 
-        deadline = self.active_time() + time_out
         repeat_count = 0
-        while self.active_time() < deadline:
+        for frame in self.loop(time_out, yield_frame=True, raise_if_time_out=False):
             if max_repeat and repeat_count >= max_repeat:
                 break
 
-            frame = self.next_frame()
             hit_b = while_condition.detect(frame)
             if not hit_b:
                 # B 未命中 → 立即停止附加动作

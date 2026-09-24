@@ -305,8 +305,7 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
         """
         self.check_resolution()
         self.info_set("current task", self.tr("wait main esc={esc}").format(esc=esc))
-        start_time = self.active_time()
-        while self.active_time() - start_time < time_out:
+        for _ in self.loop(time_out, yield_frame=False, raise_if_time_out=False):
             if self._ensure_main(esc):
                 if after_sleep > 0:
                     self.sleep(after_sleep)
@@ -406,35 +405,17 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
             frame=frame
         )
 
-    def _find_with_scroll(
+    def _detect_with_scroll(
         self,
-        feature_name,
+        detector,
         box,
         scroll_count=-3,
         max_scrolls=5,
         delay=0.2,
-        horizontal_variance=0,
-        vertical_variance=0,
-        threshold=0,
-        use_gray_scale=False,
-        canny_lower=0, canny_higher=0,
-        frame_processor=None,
-        template=None,
-        mask_function=None,
-        frame=None,
-        match_method=cv2.TM_CCOEFF_NORMED,
-        screenshot=False,
-        limit=1,
-        target_height=0,
     ):
-        self.next_frame()
+        frame = self.next_frame()
 
-        if result := self.find_one(
-            feature_name, horizontal_variance, vertical_variance,
-            threshold, use_gray_scale, box, canny_lower, canny_higher,
-            frame_processor, template, mask_function, frame,
-            match_method, screenshot, limit, target_height,
-        ):
+        if result := detector.detect(frame):
             return result
 
         scroll_x, scroll_y = box.center()
@@ -445,12 +426,7 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
             time.sleep(delay)
             frame = self.next_frame()
 
-            if result := self.find_one(
-                feature_name, horizontal_variance, vertical_variance,
-                threshold, use_gray_scale, box, canny_lower, canny_higher,
-                frame_processor, template, mask_function, frame,
-                match_method, screenshot, limit, target_height,
-            ):
+            if result := detector.detect(frame):
                 return result
 
             current_hash = perceptual_hash(box.crop_frame(frame))
@@ -460,39 +436,61 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
 
         raise CannotFindException('Cannot find with scroll.')
 
-    def find_with_scroll(
+    def detect_with_scroll(
         self,
-        feature_name,
+        detector,
         box,
         scroll_count=-3,
         max_scrolls=5,
         delay=0.2,
         max_attempts=3,
-        horizontal_variance=0,
-        vertical_variance=0,
-        threshold=0,
-        use_gray_scale=False,
-        canny_lower=0, canny_higher=0,
-        frame_processor=None,
-        template=None,
-        mask_function=None,
-        frame=None,
-        match_method=cv2.TM_CCOEFF_NORMED,
-        screenshot=False,
-        limit=1,
-        target_height=0,
     ):
         for _ in range(max_attempts):
             try:
-                return self._find_with_scroll(
-                    feature_name, box, scroll_count, max_scrolls, delay, horizontal_variance, vertical_variance,
-                    threshold, use_gray_scale, canny_lower, canny_higher,
-                    frame_processor, template, mask_function, frame,
-                    match_method, screenshot, limit, target_height
-                )
+                return self._detect_with_scroll(detector, box, scroll_count, max_scrolls, delay)
             except CannotFindException:
                 scroll_x, scroll_y = box.center()
                 self.scroll(scroll_x, scroll_y, -scroll_count * max_scrolls)
                 time.sleep(delay)
 
         raise CannotFindException('Cannot find with scroll.')
+
+    def loop(
+        self,
+        time_out: float = 10.0,
+        yield_frame: bool = True,
+        raise_if_time_out: bool | Exception | type[Exception] = True,
+    ):
+        """在超时时间内循环，每次迭代获取新帧并检查超时。
+
+        基于 self.active_time() 计算活跃时长（自动排除任务暂停时间）。
+
+        Args:
+            time_out: 最大循环时间（秒），默认 10 秒。
+            yield_frame: 是否在每次迭代时获取并产出下一帧（self.next_frame()）。
+                为 False 时产出 None。
+            raise_if_time_out: 超时未退出时的行为：
+                - True（默认）：抛出 TimeoutError('Loop time out.')；
+                - False / None：正常退出循环（不抛出异常）；
+                - Exception 实例：直接 raise 该异常实例；
+                - Exception 子类：raise 该异常类('Loop time out.')。
+
+        Yields:
+            Frame | None: yield_frame 为 True 时返回图像帧，为 False 时返回 None。
+
+        Raises:
+            TimeoutError: 当 raise_if_time_out 为 True 且循环超时未中断时抛出。
+            Exception: 当 raise_if_time_out 传入自定义异常且循环超时未中断时抛出。
+        """
+        start_time = self.active_time()
+        while self.active_time() - start_time < time_out:
+            if yield_frame:
+                yield self.next_frame()
+            else:
+                yield None
+        if raise_if_time_out:
+            if isinstance(raise_if_time_out, Exception):
+                raise raise_if_time_out
+            if isinstance(raise_if_time_out, type) and issubclass(raise_if_time_out, Exception):
+                raise raise_if_time_out("Loop time out.")
+            raise TimeoutError("Loop time out.")

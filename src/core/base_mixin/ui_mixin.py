@@ -51,13 +51,10 @@ class UIMixin:
             interval = getattr(self, "once_sleep_time", 1.0)
 
         logger.info(f"UI goto destination: {dest_page}")
-        # 暂停感知时钟：与 BaseGameTask.wait_until/sleep 的暂停语义一致，
-        # 暂停期间导航超时预算不消耗
-        start_time = self.active_time()
         page_not_found_time = None
 
         try:
-            while True:
+            for _ in self.loop(time_out, yield_frame=True, raise_if_time_out=False):
                 # 检查任务退出信号与禁用状态
                 if (
                     hasattr(self, "executor")
@@ -69,8 +66,6 @@ class UIMixin:
                 if hasattr(self, "is_task_disabled") and self.is_task_disabled():
                     logger.info("UI goto aborted: task is disabled")
                     return False
-
-                self.next_frame()
 
                 # 已到达目标页面
                 if self.ui_page_appear(page=dest_page):
@@ -102,10 +97,9 @@ class UIMixin:
                         raise PageNotFoundError('Unknown page.')
                     time.sleep(0.1)
 
-                # 超时检测
-                if self.active_time() - start_time > time_out:
-                    logger.error(f"UI goto {dest_page} timed out after {time_out}s")
-                    raise WaitFailedException(f"UI goto {dest_page} timed out after {time_out}s")
+            # 超时检测
+            logger.error(f"UI goto {dest_page} timed out after {time_out}s")
+            raise WaitFailedException(f"UI goto {dest_page} timed out after {time_out}s")
         finally:
             Page.clear_connection()
 

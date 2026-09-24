@@ -238,6 +238,52 @@ hit = self.wait_expectation(TemplateDetector(FeatureList.main_ui), time_out=2.0)
 > 📖 **完整参考见 [`action_lifecycle.md`](action_lifecycle.md)** —— 含全部识别器参数（`pick` 策略、
 > `mask_function`、`use_find_one` 等）、组合器语义、典型用法配方与真实落地样例。
 
+## 循环与重试规范（`self.loop`）
+
+在任务或 Mixin 中进行**带超时的轮询、重试或多帧检测**时，**严禁裸写** `while self.active_time() - start < time_out:`、`while time.monotonic() < deadline:` 并手动 `self.next_frame()`，**必须统一使用 `self.loop`**（定义于 `BaseGameTask`）：
+
+### 为什么使用 `self.loop`
+
+1. **暂停感知（Pause-aware）**：内部基于 `self.active_time()` 计算活跃耗时，任务被用户暂停期间计时自动冻结，避免无谓超时。
+2. **自动取帧驱动**：`yield_frame=True`（默认）时每次迭代自动调用并产出下一帧（`self.next_frame()`），循环体内无需手动写 `self.next_frame()`。若不需要帧（或动作内部自行取帧），传 `yield_frame=False`（产出 `None`）。
+3. **超时行为可控**：
+   - `raise_if_time_out=True`（默认）：循环超时未提前 `break`/`return` 时抛出 `TimeoutError('Loop time out.')`。
+   - `raise_if_time_out=False`：超时后正常退出循环，可在循环后执行兜底逻辑或抛出业务异常（如 `WaitFailedException`）。
+   - `raise_if_time_out=ExceptionInstance` 或 `ExceptionClass`：超时直接抛出指定的自定义异常。
+
+### 标准用法模式
+
+- **模式 A（最常用）：默认取帧，找到目标即 break，超时自动抛 TimeoutError**
+  ```python
+  for frame in self.loop(time_out=10):
+      if target := self.find_one(FeatureList.some_btn, frame=frame):
+          self.click(target)
+          break
+  ```
+
+- **模式 B：超时后执行特定兜底或抛业务异常（WaitFailedException）**
+  ```python
+  for frame in self.loop(time_out=10, raise_if_time_out=False):
+      if self._check_success(frame):
+          return
+  raise WaitFailedException("操作超时")
+  ```
+
+- **模式 C：不需要自动取帧的时间控制循环**
+  ```python
+  for _ in self.loop(time_out=10, yield_frame=False, raise_if_time_out=False):
+      if self.try_step():
+          return
+  ```
+
+- **模式 D：直接指定超时抛出的异常类型或实例**
+  ```python
+  for frame in self.loop(time_out=5, raise_if_time_out=WaitFailedException("未找到确认按钮")):
+      if confirm := self.find_confirm(frame=frame):
+          self.click(confirm)
+          break
+  ```
+
 ## 辅助星结：可射击光圈检测与辅助任务
 
 星结时（智慧种族与奇波通过星结卡缔结契约），光标指向目标会在屏幕中心出现一道

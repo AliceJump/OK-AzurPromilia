@@ -97,10 +97,8 @@ class TreasureUnlockTask(BaseGameTask, TriggerTask):
     def run(self):
         budget = float(self.config.get("_单次运行时长上限(秒)", 25.0))
         interval = max(0.02, float(self.config.get("_检测间隔(秒)", 0.08)))
-        deadline = self.active_time() + budget
 
-        while self.active_time() < deadline:
-            frame = self.next_frame()
+        for frame in self.loop(budget, raise_if_time_out=False):
             if frame is None:
                 self.sleep(interval)
                 continue

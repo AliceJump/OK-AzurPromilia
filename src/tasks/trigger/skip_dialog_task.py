@@ -22,28 +22,26 @@ class SkipDialogTask(BaseGameTask, TriggerTask):
 
         logger.info("检测到跳过对话框，开始处理")
 
-        deadline = self.active_time() + 3
+        while True:
+            clicked = False
+            for frame in self.loop(3, raise_if_time_out=False):
+                # 优先处理 Skip
+                if skip_dialog := self.find_feature(
+                    feature_name=FeatureList.skip_dialog,
+                    frame=frame,
+                ):
+                    self.click(skip_dialog)
+                    clicked = True
+                    break
 
-        while self.active_time() < deadline:
-            frame = self.next_frame()
+                # 处理 Confirm
+                if confirm := self.find_confirm():
+                    self.click(confirm)
+                    clicked = True
+                    break
 
-            # 优先处理 Skip
-            if skip_dialog := self.find_feature(
-                feature_name=FeatureList.skip_dialog,
-                frame=frame,
-            ):
-                self.click(skip_dialog)
+                # 当前帧没有找到，继续尝试
+                self.sleep(0.05)
 
-                # 成功触发一次操作，重新给连续对话留时间
-                deadline = self.active_time() + 3
-                continue
-
-            # 处理 Confirm
-            if confirm := self.find_confirm():
-                self.click(confirm)
-                # 成功点击后，继续等待下一段
-                deadline = self.active_time() + 3
-                continue
-
-            # 当前帧没有找到，继续尝试
-            self.sleep(0.05)
+            if not clicked:
+                break

@@ -78,12 +78,10 @@ class TestTreasureBandTask(BaseGameTask):
         roi = self.box_of_screen(ROI_X, ROI_Y, ROI_TO_X, ROI_TO_Y, name="treasure_roi")
         self.log_info(f"颜色带 ROI: x={roi.x} y={roi.y} w={roi.width} h={roi.height}")
 
-        deadline = self.active_time() + duration
         last_signature = None
         saved = False
 
-        while self.active_time() < deadline:
-            frame = self.next_frame()
+        for frame in self.loop(duration, raise_if_time_out=False):
             if frame is None:
                 self.sleep(interval)
                 continue
