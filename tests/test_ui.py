@@ -1,3 +1,4 @@
+import time
 import unittest
 from unittest.mock import MagicMock
 
@@ -18,6 +19,10 @@ class MockTask(UIMixin):
         self.once_sleep_time = 0.0
         self.clicks = []
         self.current_features = set()
+
+    def active_time(self):
+        """模拟 BaseGameTask 的暂停感知时钟（ui_goto 超时预算使用）。"""
+        return time.monotonic()
 
     def is_task_disabled(self):
         return self.disabled

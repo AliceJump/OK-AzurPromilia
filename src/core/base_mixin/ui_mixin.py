@@ -51,7 +51,9 @@ class UIMixin:
             interval = getattr(self, "once_sleep_time", 1.0)
 
         logger.info(f"UI goto destination: {dest_page}")
-        start_time = time.monotonic()
+        # 暂停感知时钟：与 BaseGameTask.wait_until/sleep 的暂停语义一致，
+        # 暂停期间导航超时预算不消耗
+        start_time = self.active_time()
         page_not_found_time = None
 
         try:
@@ -101,7 +103,7 @@ class UIMixin:
                     time.sleep(0.1)
 
                 # 超时检测
-                if time.monotonic() - start_time > time_out:
+                if self.active_time() - start_time > time_out:
                     logger.error(f"UI goto {dest_page} timed out after {time_out}s")
                     raise WaitFailedException(f"UI goto {dest_page} timed out after {time_out}s")
         finally:
