@@ -15,7 +15,7 @@ from src.core.config_migration import migrate_config_file_keys, migrate_config_v
 from src.core.game_window import find_game_hwnd
 from src.core.global_config_store import get_global_config
 from src.data.feature_list import FeatureList
-from src.data.page import page_main
+from src.data.page import PageNotFoundError, page_main
 from src.data.lang import get_lang_accessor
 from src.image.hsv_config import HSVRange
 from src.image.frame_processes import make_hsv_isolator
@@ -60,6 +60,7 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
         self._task_pause_started_at = None
         self._active_time_paused_total = 0.0
         self._seen_executor_pause_start = getattr(self.executor, "pause_start", None)
+        self._logged_in = False
 
     # ── 暂停感知的活动计时 ─────────────────────────────
     def active_time(self) -> float:
@@ -257,96 +258,63 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
             pass
         self.log_info(str(message))
 
+    def _ensure_main(self, esc):
+        """单次尝试确保回到主界面。
+
+        若已处于主界面或成功通过拓扑导航到达主界面，置 `_logged_in = True` 并返回 True。
+        若处于未识别页面（PageNotFoundError），则依次尝试登录弹窗、确认弹窗或按返回键恢复，并返回 False。
+        若在已知页面间拓扑导航超时（WaitFailedException），按预期不予捕获，直接向外抛出。
+        """
+        try:
+            self.ui_ensure(page_main)
+            self._logged_in = True
+            return True
+        except PageNotFoundError:
+            if (
+                self.handle_login() or
+                self.handle_confirm()
+            ):
+                self.sleep(self.once_sleep_time)
+            elif esc:
+                self.back()
+                self.sleep(self.once_sleep_time)
+            return False
+
     def ensure_main(self, esc=True, time_out=90, after_sleep=0):
         """
         确保回到主界面（游戏世界）。
 
-        采用两段稳定检查确认主界面：
-        1. 第一段（疑似确认）：检测到一帧疑似主界面（Esc 图标）后，再确认一帧，
-           过滤加载/返回动画中的单帧闪屏误检；
-        2. 第二段（最终确认）：仅在第一段通过后执行，主界面状态须持续 2 秒。
-
-        两段检查共享同一时间预算（time_out），确保总耗时不超过指定超时时间。
-        恢复阶段（按 ESC 返回）在总预算内循环执行两段检查：第二段未通过时
-        回到第一段继续恢复等待，直到总超时，避免主界面刚出现时图标未稳定
-        匹配导致提前失败。
+        采用基于 UI 拓扑图导航与兜底恢复机制回到主界面：
+        1. 尝试通过 `ui_ensure(page_main)` 导航至主界面；
+        2. 若处于未识别页面（捕获 `PageNotFoundError`），依次尝试处理登录弹窗（`handle_login`）、
+           确认弹窗（`handle_confirm`）或发送返回键（`back`）；
+        3. 在总超时时间（`time_out`）内循环重试。若在已知页面间拓扑导航超时，
+           按设计直接向外抛出 `WaitFailedException`，由调用方处理或中断任务。
 
         Args:
-            esc: 是否在失败时执行返回键处理。
-            time_out: 等待主界面的总超时时间。
-            after_sleep: 成功后额外等待时间。
+            esc: 是否在未识别页面且无弹窗时执行返回键处理。
+            time_out: 等待主界面的总超时时间（秒）。
+            after_sleep: 成功回到主界面后额外等待时间（秒）。
 
         Returns:
             None
 
         Raises:
-            Exception: 当无法回到主界面时抛出。
+            RuntimeError: 当总超时仍未回到主界面时抛出。
+            WaitFailedException: 当已知页面间的拓扑导航超时未到达目标时直接向外抛出。
         """
         self.check_resolution()
         self.info_set("current task", self.tr("wait main esc={esc}").format(esc=esc))
-        start = self.active_time()
-        observe_time = min(2.0, time_out)
+        start_time = self.active_time()
+        while self.active_time() - start_time < time_out:
+            if self._ensure_main(esc):
+                if after_sleep > 0:
+                    self.sleep(after_sleep)
+                self.info_set("current task", self.tr("in main esc={esc}").format(esc=esc))
+                return
+        raise RuntimeError('Failed to ensure main.')
 
-        def main_suspected(use_esc):
-            # 第一段稳定检查：疑似主界面（Esc）连续两帧出现才算通过
-            if not self.is_main(esc=use_esc):
-                return False
-            return self.is_main(esc=use_esc)
-
-        def main_stable(use_esc):
-            # 第二段稳定检查（最终确认）：仅在第一段通过后执行，状态须持续 2 秒
-            # 使用剩余时间预算，避免超出总 time_out
-            remaining = time_out - (self.active_time() - start)
-            if remaining <= 0:
-                return False
-            # 理想稳定时间为 2 秒，但不超过剩余预算
-            stable_time_out = min(3.0, remaining)
-            stable_settle = min(2.0, remaining)
-            return self.wait_until(
-                lambda: self.is_main(esc=use_esc),
-                time_out=stable_time_out,
-                settle_time=stable_settle,
-                raise_if_not_found=False,
-            )
-
-        # Give loading and return animations a chance to finish before recovery input.
-        result = self.wait_until(
-            lambda: main_suspected(False),
-            time_out=observe_time,
-            settle_time=0,
-            raise_if_not_found=False,
-        )
-        if result:
-            result = main_stable(False)
-
-        if not result and self.active_time() - start < time_out:
-            self._next_main_recovery_time = self.active_time()
-            # 恢复阶段：循环两段检查直到总预算耗尽，第二段失败不中断恢复
-            while self.active_time() - start < time_out:
-                remaining = time_out - (self.active_time() - start)
-                if remaining <= 0:
-                    break
-                result = self.wait_until(
-                    lambda: main_suspected(esc),
-                    time_out=remaining,
-                    settle_time=0,
-                    raise_if_not_found=False,
-                )
-                if not result:
-                    break
-                # 最终确认只观察不按键，避免返回键干扰刚出现的稳定状态
-                result = main_stable(False)
-                if result:
-                    break
-                self.log_info("主界面第二段稳定检查未通过，继续恢复等待")
-
-        if not result:
-            raise Exception("Please start in game world and in team!")
-        if after_sleep > 0:
-            self.sleep(after_sleep)
-        self.info_set("current task", self.tr("in main esc={esc}").format(esc=esc))
-
-    def wait_login(self):
+    def handle_login(self):
         """
         处理登录界面的各种弹窗（月卡、签到、奖励等）。
         """
@@ -355,40 +323,17 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
             mask_function=make_hsv_isolator(HSVRange.WHITE),
         ):
             self.click(0.5, 0.5)
-
-    def is_main(self, esc=False):
-        """
-        判断是否处于可执行任务的主界面状态。
-
-        Args:
-            esc: 是否在处理失败时按返回键。
-
-        Returns:
-            bool: 处于主界面返回 True，否则返回 False。
-        """
-
-        self.next_frame()
-
-        # Stability is handled by ensure_main's outer wait.
-        if self.ui_page_appear(page_main):
-            self._logged_in = True
             return True
-        # 登录流程处理成功
-        self.wait_login()
+        return False
 
+    def handle_confirm(self):
+        """处理游戏内的特定确认弹窗（如断线重连、系统提示等）。"""
         if result := (
             self.find_one(feature=[FeatureList.confirm_button, FeatureList.confirm_button_2], vertical_variance=0.01, horizontal_variance=0.02)
         ):
             self.log_info("检测到特定弹窗，尝试点击确认")
             self.click(result)
-            self._next_main_recovery_time = self.active_time() + self.once_sleep_time
-            return False
-
-        if esc and self.active_time() >= getattr(self, "_next_main_recovery_time", 0):
-            self.log_info("主界面自然恢复等待结束，发送返回键")
-            self.back()
-            self._next_main_recovery_time = self.active_time() + self.once_sleep_time
-
+            return True
         return False
 
     def get_game_hwnd(self) -> int:

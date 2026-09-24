@@ -8,6 +8,9 @@ from src.data.feature_list import FeatureList
 from src.image.hsv_config import HSVRange
 from src.image.frame_processes import make_hsv_isolator
 
+class PageNotFoundError(Exception):
+    """当前画面持续未匹配到任何已注册的 Page 拓扑节点时抛出。"""
+    pass
 
 class Page:
     """页面定义与寻路拓扑节点。
@@ -223,7 +226,7 @@ page_menu = Page(FeatureList.menu_backpack, check_kwargs={'mask_function': make_
 page_main.link(_send_key('esc'), page_menu, back_button=_send_key('esc'))
 
 # home
-page_home = Page(FeatureList.home_kibi_manage, check_kwargs={'use_gray_scale': True})
+page_home = Page(FeatureList.home_kibo_manage, check_kwargs={'use_gray_scale': True})
 page_menu.link(_click_box(0.2276, 0.9111, 0.2401, 0.9333), page_home, back_button=_send_key('esc'))
 page_home.link(_click_home(), page_main)
 
@@ -243,5 +246,24 @@ page_home_building.link(_find_with_scroll_then_click(FeatureList.home_building_p
 # home_restaurant
 page_home_restaurant = Page(FeatureList.home_restaurant_check, check_kwargs={'mask_function': make_hsv_isolator(HSVRange.WHITE, invert=False)})
 page_home.link(_click_box(0.0932, 0.6593, 0.1594, 0.6954), page_home_restaurant, back_button=_send_key('esc'))
+
+# commission
+page_commission = Page(FeatureList.commission_check)
+page_main.link(_send_key('f4'), page_commission)
+page_commission.link(_click_home(), page_main)
+
+# commission_daily
+page_commission_daily_material = Page(FeatureList.commission_daily_material_check).link(_send_key('esc'), page_commission)
+page_commission_daily_boss = Page(FeatureList.commission_daily_boss_check).link(_send_key('esc'), page_commission)
+page_commission_daily_equipment = Page(FeatureList.commission_daily_equipment_check).link(_send_key('esc'), page_commission)
+page_commission.link(_click_box(0.6635, 0.6713, 0.7042, 0.7074), page_commission_daily_material)
+page_commission_daily_boss.link(_click_box(0.3000, 0.9398, 0.3208, 0.9565), page_commission_daily_material)
+page_commission_daily_equipment.link(_click_box(0.3000, 0.9398, 0.3208, 0.9565), page_commission_daily_material)
+page_commission_daily_material.link(_click_box(0.4932, 0.9361, 0.5146, 0.9602), page_commission_daily_boss)
+page_commission_daily_equipment.link(_click_box(0.4932, 0.9361, 0.5146, 0.9602), page_commission_daily_boss)
+page_commission_daily_material.link(_click_box(0.6885, 0.9389, 0.7089, 0.9593), page_commission_daily_equipment)
+page_commission_daily_boss.link(_click_box(0.6885, 0.9389, 0.7089, 0.9593), page_commission_daily_equipment)
+
+
 
 Page.build()
