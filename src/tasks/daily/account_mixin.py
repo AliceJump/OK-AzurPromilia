@@ -112,16 +112,19 @@ class AccountMixin(AccountOverrideMixin):
         self._bind_account_aware_config_get()
 
     def _wait_ms_indicator(self) -> bool:
-        """检测主界面左下角的延迟显示（信号图标）是否出现，即是否已登录。
+        """检测主界面左下角的延迟显示（信号条）是否出现，即是否已登录。
 
         为什么数像素而不是模板匹配：延迟显示绘制在半透明面板上，白色
         ``45ms`` 文本与背景混色，模板匹配跨明暗背景得分 0.0~1.0 波动；
-        信号图标是不透明纯色绿（H≈71，实测跨会话逐像素一致，绿条宽度有
-        15/16/23px 三种渲染变体，取数像素可全部覆盖）。 HSV 色相与场景
-        草地（H≈33-36）完全分离，误报风险低。
+        信号条是不透明纯色（实测 40 帧全为绿 H≈71，跨会话逐像素一致，
+        绿条宽度有 15/16/23px 三种渲染变体，数像素可全部覆盖）。
+
+        颜色范围用 ``HSVRange.SIGNAL_BARS``：绿之外防御性纳入黄/红
+        （高延迟变色是延迟指示的通行做法），S/V 阈值取高以排除场景
+        渗色（草地绿 H≈33-36 S≈130、面板渗色青蓝 H≈101-112）。
         """
         detector = PixelCountDetector(
-            HSVRange.SIGNAL_GREEN,
+            HSVRange.SIGNAL_BARS,
             box=self.box_of_screen(0.020, 0.976, 0.038, 0.999),
             min_count=60,
             name="ms_indicator",
