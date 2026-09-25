@@ -135,6 +135,9 @@ class CommissionDailyTask(BaseGameTask):
                 self.send_key('f1')
                 self.sleep(self.once_sleep_time)
         for _ in self.loop(480):
+            if self.find_one(FeatureList.auto_combat_setting):
+                self.sleep(self.once_sleep_time)
+                continue
             if self.find_one(FeatureList.bond_levelup_popup):
                 self.click(self.box_of_screen(0.4568, 0.8324, 0.5448, 0.8824))
                 self.sleep(0.1)
