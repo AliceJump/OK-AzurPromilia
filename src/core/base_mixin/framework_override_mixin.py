@@ -50,6 +50,48 @@ class FrameworkOverrideMixin:
             mask_function, frame, limit, target_height,
         )
 
+    def wait_feature(
+        self,
+        feature,
+        horizontal_variance=0,
+        vertical_variance=0,
+        threshold=0,
+        time_out=0,
+        pre_action=None,
+        post_action=None,
+        use_gray_scale=False,
+        box=None,
+        raise_if_not_found=False,
+        canny_lower=0,
+        canny_higher=0,
+        settle_time=-1,
+        frame_processor=None,
+        target_height=0,
+        mask_function=None,
+    ):
+        """覆写框架 ``wait_feature``：补充 ``mask_function`` 支持。
+
+        框架原生 ``wait_feature`` 不接收 ``mask_function``（只透传给
+        ``find_one`` 的参数里没有它），依赖白色/颜色掩码的特征（如
+        ``login_out``）在等待式检测里会丢失掩码。这里补齐透传；
+        ``raise_if_not_found`` 语义与框架一致，默认 False（超时未命中
+        返回 None 而不抛出）。
+        """
+        return self.wait_until(
+            lambda: self.find_one(
+                feature, horizontal_variance, vertical_variance, threshold,
+                use_gray_scale=use_gray_scale, box=box,
+                canny_lower=canny_lower, canny_higher=canny_higher,
+                frame_processor=frame_processor, target_height=target_height,
+                mask_function=mask_function,
+            ),
+            time_out=time_out,
+            pre_action=pre_action,
+            post_action=post_action,
+            raise_if_not_found=raise_if_not_found,
+            settle_time=settle_time,
+        )
+
     def find_one(
         self,
         feature_name=None,

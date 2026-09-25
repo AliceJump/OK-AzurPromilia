@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 
 from src.core.account_override_mixin import AccountOverrideMixin
+from src.core.detector.pixel_count_detector import PixelCountDetector
 from src.data.feature_list import FeatureList
 from src.image.hsv_config import HSVRange
 from src.image.frame_processes import make_hsv_isolator
@@ -110,8 +111,41 @@ class AccountMixin(AccountOverrideMixin):
         self.current_account_id = account_id
         self._bind_account_aware_config_get()
 
+    def _wait_ms_indicator(self) -> bool:
+        """检测主界面左下角的延迟显示（信号图标）是否出现，即是否已登录。
+
+        为什么数像素而不是模板匹配：延迟显示绘制在半透明面板上，白色
+        ``45ms`` 文本与背景混色，模板匹配跨明暗背景得分 0.0~1.0 波动；
+        信号图标是不透明纯色绿（H≈71，实测跨会话逐像素一致，绿条宽度有
+        15/16/23px 三种渲染变体，取数像素可全部覆盖）。 HSV 色相与场景
+        草地（H≈33-36）完全分离，误报风险低。
+        """
+        detector = PixelCountDetector(
+            HSVRange.SIGNAL_GREEN,
+            box=self.box_of_screen(0.020, 0.976, 0.038, 0.999),
+            min_count=60,
+            name="ms_indicator",
+        ).attach(self)
+        for frame in self.loop(3, raise_if_time_out=False):
+            if detector.detect(frame):
+                return True
+        return False
+
+    def logout_to_login_screen(self):
+        """已登录状态下退出到登录界面的流程（占位，尚未实现）。
+
+        实现要求：把当前已登录的会话退到登录/选号界面（例如走游戏内
+        设置的退出登录），完成后 ``login_flow`` 的既有流程（点登录外
+        按钮 → 确认 → 切号 → 选账号 → 登录）才能接手。
+        """
+        self.log_info("logout_to_login_screen 尚未实现（占位）：无法退出已登录会话", notify=True)
+
     def login_flow(self, username: str):
-        """切换到指定账号：回主界面 → 设置 → 登出 → 确认 → 切号 → 选账号 → 登录。
+        """切换到指定账号：判断登录态 → （已登录时先登出）→ 登出 → 确认 → 切号 → 选账号 → 登录。
+
+        登录态判定：主界面左下角延迟显示的**信号图标**（不透明纯色绿，跨背景
+        逐像素稳定）。已登录（图标存在）需要先走 ``logout_to_login_screen``
+        退出到登录界面；未登录直接走既有流程。
 
         全程用 ``wait_click_feature`` / ``wait_click_ocr``，元素缺失时只记日志不中断
         （``raise_if_not_found=False``），因此调用后**务必用 ``_logged_in`` 或主界面检测确认结果**，
@@ -120,9 +154,16 @@ class AccountMixin(AccountOverrideMixin):
         Args:
             username: 要切换到的账号标识（手机号）；界面按后四位匹配。
         """
-        if not (result := self.find_feature(
-        feature_name=FeatureList.login_out,
+        if self._wait_ms_indicator():
+            # 已登录：需要先退出到登录界面，未实现时既有流程大概率找不到
+            # 登录外按钮而空跑，由调用方根据 _logged_in 判定结果
+            self.logout_to_login_screen()
+
+        if not (result := self.wait_feature(
+            FeatureList.login_out,
             mask_function=make_hsv_isolator(HSVRange.WHITE),
+            time_out=3,
+            raise_if_not_found=False,
         )):
             return
         self.click(result)

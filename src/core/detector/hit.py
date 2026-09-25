@@ -16,6 +16,7 @@ SOURCE_YOLO = "yolo"
 SOURCE_OCR = "ocr"
 SOURCE_BUTTON = "button"
 SOURCE_PREDICATE = "predicate"
+SOURCE_HSV = "hsv"
 
 
 @dataclass
