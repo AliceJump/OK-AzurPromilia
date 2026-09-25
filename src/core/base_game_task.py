@@ -328,7 +328,11 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
     def handle_confirm(self):
         """处理游戏内的特定确认弹窗（如断线重连、系统提示等）。"""
         if result := (
-            self.find_one(feature=[FeatureList.confirm_button, FeatureList.confirm_button_2], vertical_variance=0.01, horizontal_variance=0.02)
+            self.find_one(feature=[
+                FeatureList.confirm_button,
+                FeatureList.confirm_button_2,
+                FeatureList.confirm_button_3,
+            ], vertical_variance=0.01, horizontal_variance=0.02)
         ):
             self.log_info("检测到特定弹窗，尝试点击确认")
             self.click(result)

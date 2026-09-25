@@ -250,8 +250,7 @@ page_home.link(_click_box(0.0932, 0.6593, 0.1594, 0.6954), page_home_restaurant,
 
 # commission
 page_commission = Page(FeatureList.commission_check)
-page_main.link(_send_key('f4'), page_commission)
-page_commission.link(_click_home(), page_main)
+page_main.link(_send_key('f4'), page_commission, _click_home())
 
 # commission_daily
 page_commission_daily_material = Page(FeatureList.commission_daily_material_check).link(_send_key('esc'), page_commission).link(_click_home(), page_main)
@@ -265,6 +264,26 @@ page_commission_daily_equipment.link(_click_box(0.4932, 0.9361, 0.5146, 0.9602),
 page_commission_daily_material.link(_click_box(0.6885, 0.9389, 0.7089, 0.9593), page_commission_daily_equipment)
 page_commission_daily_boss.link(_click_box(0.6885, 0.9389, 0.7089, 0.9593), page_commission_daily_equipment)
 
+# mail
+page_mail = Page(FeatureList.mail_button_claim_all, check_kwargs={'mask_function': make_hsv_isolator(HSVRange.WHITE, invert=False)})
+page_menu.link(_click_box(0.1401, 0.0972, 0.1563, 0.1194), page_mail, back_button=_send_key('esc'))
+
+# shop
+page_shop = Page(FeatureList.shop_check, check_kwargs={'mask_function': make_hsv_isolator(HSVRange.WHITE, invert=False)})
+page_main.link(_send_key('f6'), page_shop, _click_home())
+page_menu.link(_click_box(0.7448, 0.7833, 0.7589, 0.8074), page_shop)
+
+# active
+page_active_daily = Page(FeatureList.active_daily_check, check_kwargs={'mask_function': make_hsv_isolator(HSVRange.WHITE, invert=True)})
+page_active_weekly = Page(FeatureList.active_weekly_check, check_kwargs={'mask_function': make_hsv_isolator(HSVRange.WHITE, invert=True)})
+page_main.link(_send_key('f5'), page_active_daily, _send_key('esc'))
+page_active_weekly.link(_send_key('esc'), page_main)
+page_active_daily.link(_click_box(0.5500, 0.0315, 0.5891, 0.0537), page_active_weekly)
+page_active_weekly.link(_click_box(0.4104, 0.0296, 0.4500, 0.0537), page_active_daily)
+
+# big_month_card
+page_big_month_card = Page(FeatureList.big_month_card_check, check_kwargs={'mask_function': make_hsv_isolator(HSVRange.WHITE, invert=True)})
+page_main.link(_send_key('f2'), page_big_month_card, _click_home())
 
 
 Page.build()

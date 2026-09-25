@@ -105,6 +105,7 @@ config = {
         ["src.tasks.onetime.daily_task", "DailyTask"],
         ["src.tasks.onetime.home_daily_task", "HomeDailyTask"],
         ["src.tasks.onetime.commission_daily_task", "CommissionDailyTask"],
+        ["src.tasks.onetime.claim_daily_task", "ClaimDailyTask"],
         ["src.tasks.test.test_screenshot_task", "TestScreenshotTask"],
         ["src.tasks.test.test_interaction_task", "TestInteractionTask"],
         ["src.tasks.test.test_treasure_band_task", "TestTreasureBandTask"],
