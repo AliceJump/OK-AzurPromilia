@@ -170,7 +170,7 @@ class ClaimDailyTask(BaseGameTask):
                 self.sleep(0.1)
                 continue
             if self.find_one(FeatureList.active_weekly_check) and not self.find_one(
-                FeatureList.active_daily_exclamation_mark,
+                FeatureList.active_weekly_exclamation_mark,
                 mask_function=active_exclamation_mark_mask,
             ):
                 frame_count += 1
