@@ -129,7 +129,7 @@ class TestWaitMsIndicatorWiring(unittest.TestCase):
         task = object.__new__(AccountMixin)
         task.logged = []
         task.log_info = lambda *a, **k: None
-        task.box_of_screen = lambda *args: Box(38, 1054, 35, 25)
+        task.box_of_screen = lambda *args: Box(44, 1057, 27, 19)
 
         def loop(time_out=10, **kwargs):
             for f in frames:

@@ -125,7 +125,9 @@ class AccountMixin(AccountOverrideMixin):
         """
         detector = PixelCountDetector(
             HSVRange.SIGNAL_BARS,
-            box=self.box_of_screen(0.020, 0.976, 0.038, 0.999),
+            # 40 帧实测信号条稳定在 (47,1060)-(69,1073)，位置零位移，
+            # 框只留 1px 余量（26x20），避免半透明面板的场景渗色混入计数
+            box=self.box_of_screen(0.023, 0.979, 0.037, 0.997),
             min_count=60,
             name="ms_indicator",
         ).attach(self)
