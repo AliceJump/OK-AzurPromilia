@@ -115,6 +115,8 @@ class ClaimDailyTask(BaseGameTask):
                 frame_count += 1
                 if frame_count >= 5:
                     break
+            else:
+                frame_count = 0
 
     def claim_active(self):
         self.ui_ensure(page_active_daily)
@@ -146,6 +148,8 @@ class ClaimDailyTask(BaseGameTask):
                 frame_count += 1
                 if frame_count >= 5:
                     break
+            else:
+                frame_count = 0
 
         self.ui_ensure(page_active_weekly)
         frame_count = 0
@@ -176,6 +180,8 @@ class ClaimDailyTask(BaseGameTask):
                 frame_count += 1
                 if frame_count >= 5:
                     break
+            else:
+                frame_count = 0
 
     def claim_big_month_card(self):
         self.ui_ensure(page_big_month_card)
@@ -185,44 +191,40 @@ class ClaimDailyTask(BaseGameTask):
                 break
             self.click(self.box_of_screen(0.6089, 0.9611, 0.6219, 0.9815))
             self.sleep(0.1)
-        frame_count = 0
+        stable_time = self.active_time()
         for _ in self.loop():
             if box := self.find_one(FeatureList.big_month_card_button_claim_all):
-                frame_count = 0
                 self.click(box)
                 self.sleep(0.1)
+                stable_time = self.active_time()
                 continue
             if self.find_one(FeatureList.big_month_card_levelup_popup):
-                frame_count = 0
                 self.click(self.safe_box)
                 self.sleep(0.1)
+                stable_time = self.active_time()
                 continue
-            if self.find_one(FeatureList.big_month_card_task_check):
-                frame_count += 1
-                if frame_count >= 5:
-                    break
+            if self.active_time() - stable_time >= 1 and self.find_one(FeatureList.big_month_card_task_check):
+                break
 
         for _ in self.loop():
             if self.find_one(FeatureList.big_month_card_reward_check):
                 break
             self.click(self.box_of_screen(0.4375, 0.9611, 0.4500, 0.9815))
             self.sleep(0.1)
-        frame_count = 0
+        stable_time = self.active_time()
         for _ in self.loop():
             if box := self.find_one(FeatureList.big_month_card_button_claim_all):
-                frame_count = 0
                 self.click(box)
                 self.sleep(0.1)
+                stable_time = self.active_time()
                 continue
             if self.find_one(FeatureList.claim_popup):
-                frame_count = 0
                 self.click(self.safe_box)
                 self.sleep(0.1)
+                stable_time = self.active_time()
                 continue
-            if self.find_one(FeatureList.big_month_card_reward_check):
-                frame_count += 1
-                if frame_count >= 5:
-                    break
+            if self.active_time() - stable_time >= 1 and self.find_one(FeatureList.big_month_card_reward_check):
+                break
 
     def run(self):
         self.claim_mail()
