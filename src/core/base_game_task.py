@@ -413,7 +413,7 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
         self,
         detector,
         box,
-        scroll_count=-3,
+        scroll_count=-10,
         max_scrolls=5,
         delay=0.2,
     ):
@@ -445,7 +445,7 @@ class BaseGameTask(RuntimeMixin, UIMixin, FrameworkOverrideMixin, BaseTask):
         self,
         detector,
         box,
-        scroll_count=-3,
+        scroll_count=-10,
         max_scrolls=5,
         delay=0.2,
         max_attempts=3,

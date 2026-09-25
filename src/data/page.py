@@ -215,7 +215,13 @@ def _click_box(x, y, to_x, to_y):
     return lambda task: task.click(task.box_of_screen(x, y, to_x, to_y))
 
 def _find_with_scroll_then_click(feature, box):
-    return lambda task: task.click(task.detect_with_scroll(TemplateDetector(feature), task.box_of_screen(*box)))
+    return lambda task: task.click(task.detect_with_scroll(
+        TemplateDetector(
+            feature,
+            box=task.box_of_screen(*box)
+        ),
+        task.box_of_screen(*box)
+    ))
 
 def _click_home():
     return _click_box(0.1771, 0.0389, 0.1927, 0.0630)

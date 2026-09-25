@@ -114,7 +114,13 @@ class HomeDailyTask(BaseGameTask):
             expect=TemplateDetector(FeatureList.pot_category_all_activated),
             max_attempts=3
         )
-        food_hit = self.detect_with_scroll(TemplateDetector(FeatureList.food_little_bobo), self.box_of_screen(0.2865, 0.2176, 0.6188, 0.8667))
+        food_hit = self.detect_with_scroll(
+            TemplateDetector(
+                FeatureList.food_little_bobo,
+                box=self.box_of_screen(0.2865, 0.2176, 0.6188, 0.8667),
+            ),
+            self.box_of_screen(0.2865, 0.2176, 0.6188, 0.8667),
+        )
         if not self.wait_action_result(
             action=lambda: self.click(food_hit),
             expect=OcrDetector(
