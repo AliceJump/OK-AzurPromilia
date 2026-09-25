@@ -1,7 +1,7 @@
 """login_flow 登录态分支与 wait_feature 覆写的测试。
 
-AccountMixin.login_flow 现在先检测主界面左下角的延迟显示（信号图标，
-HSV 像素计数）判断是否已登录：
+AccountMixin.login_flow 现在先检测主界面左下角 HUD 的 UID 字样
+（模板匹配 + 白掩码）判断是否已登录：
 - 已登录 → 先调用 logout_to_login_screen（占位，待实现）再走既有流程；
 - 未登录 → 直接走既有流程；
 - login_out 的检测由 find_feature 改为 wait_feature（mask_function 经
@@ -10,8 +10,6 @@ HSV 像素计数）判断是否已登录：
 
 import unittest
 
-import cv2
-import numpy as np
 from ok import Box
 
 from src.core.base_mixin.framework_override_mixin import FrameworkOverrideMixin
@@ -19,7 +17,7 @@ from src.data.feature_list import FeatureList
 from src.tasks.daily.account_mixin import AccountMixin
 
 
-def _make_task(ms_found, login_out_hit="fake-hit"):
+def _make_task(logged_in, login_out_hit="fake-hit"):
     """构造绕过框架初始化的 AccountMixin 实例，桩掉所有游戏交互。"""
     task = object.__new__(AccountMixin)
     task.current_user = ""
@@ -27,7 +25,7 @@ def _make_task(ms_found, login_out_hit="fake-hit"):
     task._logged_in = False
     task.calls = []
 
-    task._wait_ms_indicator = lambda: ms_found
+    task._is_logged_in = lambda: logged_in
     task.logout_to_login_screen = lambda: task.calls.append("logout")
 
     def fake_wait_feature(feature, **kwargs):
@@ -47,20 +45,20 @@ def _make_task(ms_found, login_out_hit="fake-hit"):
 
 class TestLoginFlowLoggedInBranch(unittest.TestCase):
     def test_logged_in_calls_logout_first(self):
-        task = _make_task(ms_found=True)
+        task = _make_task(logged_in=True)
         AccountMixin.login_flow(task, "1234567890")
         self.assertEqual(task.calls[0], "logout")
         # 登出占位之后仍会继续尝试既有流程
         self.assertIn("click", task.calls)
 
     def test_not_logged_in_skips_logout(self):
-        task = _make_task(ms_found=False)
+        task = _make_task(logged_in=False)
         AccountMixin.login_flow(task, "1234567890")
         self.assertNotIn("logout", task.calls)
         self.assertIn("click", task.calls)
 
     def test_login_out_uses_wait_feature_without_raise(self):
-        task = _make_task(ms_found=False)
+        task = _make_task(logged_in=False)
         AccountMixin.login_flow(task, "1234567890")
         wait_calls = [c for c in task.calls if isinstance(c, tuple) and c[0] == "wait_feature"]
         self.assertEqual(len(wait_calls), 1)
@@ -122,32 +120,36 @@ class TestWaitFeatureOverride(unittest.TestCase):
             )
 
 
-class TestWaitMsIndicatorWiring(unittest.TestCase):
-    """_wait_ms_indicator 的装配：框选区域 + 阈值 + 循环取帧。"""
+class TestIsLoggedInWiring(unittest.TestCase):
+    """_is_logged_in 的装配：UID 特征 + 白掩码 + 搜索框 + 阈值。"""
 
-    def _task_with_frames(self, frames):
+    def _task(self, wait_feature_result):
         task = object.__new__(AccountMixin)
         task.logged = []
         task.log_info = lambda *a, **k: None
-        task.box_of_screen = lambda *args: Box(44, 1057, 27, 19)
+        task.box_of_screen = lambda *args: Box(119, 1049, 125, 29)
+        seen = {}
 
-        def loop(time_out=10, **kwargs):
-            for f in frames:
-                yield f
+        def wait_feature(feature, **kwargs):
+            seen["feature"] = feature
+            seen["kwargs"] = kwargs
+            return wait_feature_result
 
-        task.loop = loop
-        return task
+        task.wait_feature = wait_feature
+        return task, seen
 
-    def test_green_in_box_reports_logged_in(self):
-        frame = np.zeros((1080, 1920, 3), np.uint8)
-        green_bgr = cv2.cvtColor(np.uint8([[(71, 200, 200)]]), cv2.COLOR_HSV2BGR)[0, 0]
-        frame[1060:1073, 47:62] = green_bgr
-        task = self._task_with_frames([frame])
-        self.assertTrue(AccountMixin._wait_ms_indicator(task))
+    def test_uid_hit_reports_logged_in(self):
+        task, seen = self._task("hit")
+        self.assertTrue(AccountMixin._is_logged_in(task))
+        self.assertEqual(seen["feature"], FeatureList.uid_text)
+        self.assertIs(seen["kwargs"]["raise_if_not_found"], False)
+        self.assertIsNotNone(seen["kwargs"]["mask_function"])
+        self.assertEqual(seen["kwargs"]["threshold"], 0.85)
 
-    def test_black_frame_reports_not_logged_in(self):
-        task = self._task_with_frames([np.zeros((1080, 1920, 3), np.uint8)])
-        self.assertFalse(AccountMixin._wait_ms_indicator(task))
+    def test_uid_miss_reports_not_logged_in(self):
+        task, seen = self._task(None)
+        self.assertFalse(AccountMixin._is_logged_in(task))
+        self.assertEqual(seen["feature"], FeatureList.uid_text)
 
 
 if __name__ == "__main__":

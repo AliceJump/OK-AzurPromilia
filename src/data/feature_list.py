@@ -55,4 +55,5 @@ class FeatureList(str, Enum):
     skip_dialog = 'skip_dialog'
     star_link_icon = 'star_link_icon'
     treasure_icon = 'treasure_icon'
+    uid_text = 'uid_text'
     treasure_key_icon = 'treasure_key_icon'

@@ -1,8 +1,9 @@
 """PixelCountDetector（HSV 像素计数判据）的测试。
 
-背景：主界面左下角延迟显示绘制在半透明面板上，白色文本与背景混色导致
-模板匹配跨背景不稳定；其信号图标为不透明纯色绿（H≈71），改用 HSV
-像素计数判定是否已登录。这里用合成帧验证判据本身的行为。
+适用场景：目标绘制在半透明面板上与背景混色、模板匹配跨背景不稳，但目标
+本体是不透明纯色（如主界面左下角延迟显示的绿色信号条）。用合成帧验证
+判据本身的计数与阈值行为（色段取自当时实测的信号条绿，此处的登录态
+检测最终改用了 UID 模板匹配，判据保留为通用工具）。
 """
 
 import unittest
@@ -13,10 +14,16 @@ from ok import Box
 
 from src.core.detector.hit import SOURCE_HSV
 from src.core.detector.pixel_count_detector import PixelCountDetector
-from src.image.hsv_config import HSVRange
 
 W, H = 1920, 1080
 GREEN_HSV = (71, 200, 200)
+# 与 RANGES 相同的四段范围（绿 + 防御性黄/红）
+RANGES = (
+    ((60, 150, 80), (90, 255, 255)),
+    ((15, 180, 150), (45, 255, 255)),
+    ((0, 180, 100), (10, 255, 255)),
+    ((170, 180, 100), (180, 255, 255)),
+)
 
 
 def _bgr_of(hsv):
@@ -43,7 +50,7 @@ def _make_task():
 class TestPixelCountDetector(unittest.TestCase):
     def test_detects_green_pixels_with_relative_region(self):
         detector = PixelCountDetector(
-            HSVRange.SIGNAL_BARS, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=60,
+            RANGES, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=60,
         ).attach(_make_task())
         hit = detector.detect(_frame_with_green())
         self.assertIsNotNone(hit)
@@ -52,7 +59,7 @@ class TestPixelCountDetector(unittest.TestCase):
 
     def test_detects_with_pixel_box(self):
         detector = PixelCountDetector(
-            HSVRange.SIGNAL_BARS, box=Box(40, 1050, 40, 30), min_count=60,
+            RANGES, box=Box(40, 1050, 40, 30), min_count=60,
         ).attach(_make_task())
         hit = detector.detect(_frame_with_green())
         self.assertIsNotNone(hit)
@@ -64,7 +71,7 @@ class TestPixelCountDetector(unittest.TestCase):
         frame = np.zeros((H, W, 3), np.uint8)
         frame[1060:1073, 50:66] = _bgr_of((30, 220, 220))
         detector = PixelCountDetector(
-            HSVRange.SIGNAL_BARS, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=60,
+            RANGES, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=60,
         ).attach(_make_task())
         self.assertIsNotNone(detector.detect(frame))
 
@@ -73,7 +80,7 @@ class TestPixelCountDetector(unittest.TestCase):
         frame = np.zeros((H, W, 3), np.uint8)
         frame[1060:1073, 50:66] = _bgr_of((5, 220, 200))
         detector = PixelCountDetector(
-            HSVRange.SIGNAL_BARS, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=60,
+            RANGES, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=60,
         ).attach(_make_task())
         self.assertIsNotNone(detector.detect(frame))
 
@@ -82,19 +89,19 @@ class TestPixelCountDetector(unittest.TestCase):
         frame = np.zeros((H, W, 3), np.uint8)
         frame[1060:1073, 50:66] = _bgr_of((35, 130, 153))
         detector = PixelCountDetector(
-            HSVRange.SIGNAL_BARS, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=60,
+            RANGES, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=60,
         ).attach(_make_task())
         self.assertIsNone(detector.detect(frame))
 
     def test_returns_none_when_count_below_min(self):
         detector = PixelCountDetector(
-            HSVRange.SIGNAL_BARS, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=10_000,
+            RANGES, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=10_000,
         ).attach(_make_task())
         self.assertIsNone(detector.detect(_frame_with_green()))
 
     def test_returns_none_without_green(self):
         detector = PixelCountDetector(
-            HSVRange.SIGNAL_BARS, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=60,
+            RANGES, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=60,
         ).attach(_make_task())
         self.assertIsNone(detector.detect(np.zeros((H, W, 3), np.uint8)))
 
@@ -103,17 +110,17 @@ class TestPixelCountDetector(unittest.TestCase):
         frame = np.zeros((H, W, 3), np.uint8)
         frame[1060:1073, 50:66] = _bgr_of((108, 219, 146))
         detector = PixelCountDetector(
-            HSVRange.SIGNAL_BARS, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=60,
+            RANGES, x=0.02, y=0.976, to_x=0.038, to_y=0.999, min_count=60,
         ).attach(_make_task())
         self.assertIsNone(detector.detect(frame))
 
     def test_detect_requires_attached_task(self):
-        detector = PixelCountDetector(HSVRange.SIGNAL_BARS, min_count=1)
+        detector = PixelCountDetector(RANGES, min_count=1)
         with self.assertRaises(RuntimeError):
             detector.detect(_frame_with_green())
 
     def test_min_count_floor_at_one(self):
-        detector = PixelCountDetector(HSVRange.SIGNAL_BARS, min_count=0)
+        detector = PixelCountDetector(RANGES, min_count=0)
         self.assertEqual(detector._min_count, 1)
 
 

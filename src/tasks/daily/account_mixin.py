@@ -21,7 +21,6 @@ from __future__ import annotations
 import re
 
 from src.core.account_override_mixin import AccountOverrideMixin
-from src.core.detector.pixel_count_detector import PixelCountDetector
 from src.data.feature_list import FeatureList
 from src.image.hsv_config import HSVRange
 from src.image.frame_processes import make_hsv_isolator
@@ -111,30 +110,25 @@ class AccountMixin(AccountOverrideMixin):
         self.current_account_id = account_id
         self._bind_account_aware_config_get()
 
-    def _wait_ms_indicator(self) -> bool:
-        """检测主界面左下角的延迟显示（信号条）是否出现，即是否已登录。
+    def _is_logged_in(self) -> bool:
+        """检测主界面左下角 HUD 的 ``UID`` 字样是否可见，即是否已登录。
 
-        为什么数像素而不是模板匹配：延迟显示绘制在半透明面板上，白色
-        ``45ms`` 文本与背景混色，模板匹配跨明暗背景得分 0.0~1.0 波动；
-        信号条是不透明纯色（实测 40 帧全为绿 H≈71，跨会话逐像素一致，
-        绿条宽度有 15/16/23px 三种渲染变体，数像素可全部覆盖）。
+        为什么用 UID 文本做模板：延迟显示绘制在半透明面板上，白色 ``45ms``
+        文本与背景混色，模板匹配跨明暗背景得分 0.0~1.0 波动；而 ``UID``
+        三字更大更稳，实测 40 帧中 35 帧得分 0.87~1.00、4 张未登录帧全部
+        0.000（唯一异常帧的 UID 被截图打码框盖住，实机不存在打码）。
 
-        颜色范围用 ``HSVRange.SIGNAL_BARS``：绿之外防御性纳入黄/红
-        （高延迟变色是延迟指示的通行做法），S/V 阈值取高以排除场景
-        渗色（草地绿 H≈33-36 S≈130、面板渗色青蓝 H≈101-112）。
+        Returns:
+            bool: True 表示已登录（HUD 可见）。
         """
-        detector = PixelCountDetector(
-            HSVRange.SIGNAL_BARS,
-            # 40 帧实测信号条稳定在 (47,1060)-(69,1073)，位置零位移，
-            # 框只留 1px 余量（26x20），避免半透明面板的场景渗色混入计数
-            box=self.box_of_screen(0.023, 0.979, 0.037, 0.997),
-            min_count=60,
-            name="ms_indicator",
-        ).attach(self)
-        for frame in self.loop(3, raise_if_time_out=False):
-            if detector.detect(frame):
-                return True
-        return False
+        return self.wait_feature(
+            FeatureList.uid_text,
+            mask_function=make_hsv_isolator(HSVRange.WHITE),
+            box=self.box_of_screen(0.062, 0.972, 0.094, 1.0),
+            time_out=3,
+            raise_if_not_found=False,
+            threshold=0.85,
+        ) is not None
 
     def logout_to_login_screen(self):
         """已登录状态下退出到登录界面的流程（占位，尚未实现）。
@@ -148,9 +142,9 @@ class AccountMixin(AccountOverrideMixin):
     def login_flow(self, username: str):
         """切换到指定账号：判断登录态 → （已登录时先登出）→ 登出 → 确认 → 切号 → 选账号 → 登录。
 
-        登录态判定：主界面左下角延迟显示的**信号图标**（不透明纯色绿，跨背景
-        逐像素稳定）。已登录（图标存在）需要先走 ``logout_to_login_screen``
-        退出到登录界面；未登录直接走既有流程。
+        登录态判定：主界面左下角 HUD 的 ``UID`` 字样（模板匹配，白掩码）。
+        已登录需要先走 ``logout_to_login_screen`` 退出到登录界面；未登录
+        直接走既有流程。
 
         全程用 ``wait_click_feature`` / ``wait_click_ocr``，元素缺失时只记日志不中断
         （``raise_if_not_found=False``），因此调用后**务必用 ``_logged_in`` 或主界面检测确认结果**，
@@ -159,7 +153,7 @@ class AccountMixin(AccountOverrideMixin):
         Args:
             username: 要切换到的账号标识（手机号）；界面按后四位匹配。
         """
-        if self._wait_ms_indicator():
+        if self._is_logged_in():
             # 已登录：需要先退出到登录界面，未实现时既有流程大概率找不到
             # 登录外按钮而空跑，由调用方根据 _logged_in 判定结果
             self.logout_to_login_screen()
